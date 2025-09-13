@@ -17,15 +17,15 @@ try {
   <meta charset="utf-8">
   <title>EcoBici Puerto Barrios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Bootstrap -->
+  <!-- Bootstrap (general) -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Font Awesome para iconos -->
+  <!-- Font Awesome (iconos) -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
 
 <!-- Navbar -->
-<nav class="navbar navbar-expand-lg bg-body-tertiary border-bottom">
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
   <div class="container">
     <a class="navbar-brand fw-bold" href="index.php">EcoBici</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
@@ -76,7 +76,7 @@ try {
     <div class="row g-4">
       <?php if ($planes): foreach ($planes as $p): ?>
         <div class="col-md-4">
-          <div class="card h-100 shadow-sm rounded-4">
+          <div class="card h-100 shadow-sm">
             <div class="card-body d-flex flex-column">
               <h5 class="card-title mb-1"><?= htmlspecialchars($p['nombre']) ?></h5>
               <p class="card-text text-muted small mb-3"><?= nl2br(htmlspecialchars($p['descripcion'] ?? '')) ?></p>
