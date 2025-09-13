@@ -1,0 +1,101 @@
+/* ===========================
+   EcoBici Puerto Barrios
+   Estilos para register.php
+   =========================== */
+
+:root {
+  --eco-green:#16a34a;
+  --eco-green-dark:#15803d;
+  --eco-soft:#e9f6ec;
+  --eco-ink:#0b1b13;
+  --eco-white:#ffffff;
+}
+
+/* Fondo con degradado */
+body {
+  min-height:100vh;
+  background:
+    radial-gradient(1400px 700px at 80% -10%, rgba(22,163,74,.12), transparent 60%),
+    linear-gradient(180deg, #f3fbf6 0%, #ffffff 55%, #f2fcf7 100%);
+  font-family:"Segoe UI", Roboto, sans-serif;
+  color:var(--eco-ink);
+  display:flex;
+  flex-direction:column;
+}
+
+/* Navbar */
+.eco-navbar {
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.92));
+  transition: box-shadow .25s, background .25s;
+}
+.eco-navbar.scrolled {
+  box-shadow:0 4px 18px rgba(0,0,0,.08);
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.90));
+}
+
+/* Main */
+main {
+  flex:1;
+  display:flex;
+  align-items:center;
+  padding:2rem 1rem;
+}
+
+/* Formulario */
+form {
+  background:#fff;
+  border:1px solid var(--eco-soft);
+  border-radius:1rem;
+  box-shadow:0 12px 28px rgba(0,0,0,.08);
+  transition: box-shadow .25s, transform .25s;
+}
+form:hover {
+  box-shadow:0 20px 44px rgba(0,0,0,.12);
+  transform:translateY(-2px);
+}
+form .form-label {
+  font-weight:500;
+  color:var(--eco-ink);
+}
+form .form-control {
+  border-radius:.5rem;
+  border-color:var(--eco-soft);
+  transition:border-color .25s, box-shadow .25s;
+}
+form .form-control:focus {
+  border-color:var(--eco-green);
+  box-shadow:0 0 0 .2rem rgba(22,163,74,.25);
+}
+
+/* Botones */
+.btn-primary {
+  background:var(--eco-green);
+  border-color:var(--eco-green);
+  transition:background .2s, transform .2s;
+}
+.btn-primary:hover {
+  background:var(--eco-green-dark);
+  border-color:var(--eco-green-dark);
+  transform:translateY(-2px);
+}
+.btn-outline-primary {
+  color:var(--eco-green);
+  border-color:var(--eco-green);
+  transition:background .2s, transform .2s;
+}
+.btn-outline-primary:hover {
+  background:var(--eco-green);
+  color:#fff;
+  transform:translateY(-2px);
+}
+
+/* Alertas */
+.alert {
+  border-radius:.75rem;
+}
+
+/* Footer */
+footer {
+  background:var(--eco-white);
+  border-top:1px solid var(--eco-soft);
+}
