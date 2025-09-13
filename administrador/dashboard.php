@@ -1,19 +1,12 @@
 <?php
 // /ecobici/administrador/dashboard.php
-require_once __DIR__ . '/admin_boot.php'; // valida sesión admin y carga $pdo
+require_once __DIR__ . '/admin_boot.php'; // valida sesión admin, helpers y $pdo
 
-// ========== Helpers locales ==========
+/* ================= Helpers locales ================= */
 if (!function_exists('e')) {
     function e($s)
     {
         return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-    }
-}
-if (!function_exists('admin_flash')) {
-    function admin_flash($f)
-    {
-        if (!$f) return;
-        echo '<div class="alert alert-' . e($f['type']) . '">' . e($f['msg']) . '</div>';
     }
 }
 function scalar(PDO $pdo, string $sql, array $params = [], $default = 0)
@@ -23,50 +16,70 @@ function scalar(PDO $pdo, string $sql, array $params = [], $default = 0)
         $st->execute($params);
         $v = $st->fetchColumn();
         return $v !== false ? $v : $default;
-    } catch (Throwable) {
+    } catch (Throwable $e) {
         return $default;
     }
 }
-function rows(PDO $pdo, string $sql, array $params = [])
+function rows(PDO $pdo, string $sql, array $params = []): array
 {
     try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         return $st->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable) {
+    } catch (Throwable $e) {
         return [];
     }
 }
 
-// ========== KPIs ==========
-$usuariosTotal       = scalar($pdo, "SELECT COUNT(*) FROM users");
-$clientesTotal       = scalar($pdo, "SELECT COUNT(*) FROM users WHERE role='cliente'");
-$planesTotal         = scalar($pdo, "SELECT COUNT(*) FROM plans");
-$subsActivas         = scalar($pdo, "SELECT COUNT(*) FROM subscriptions WHERE estado='activa'");
-$subsPendientes      = scalar($pdo, "SELECT COUNT(*) FROM subscriptions WHERE estado='pendiente'");
-$ingresosMes         = scalar($pdo, "SELECT IFNULL(SUM(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
-$pagosPendientesMes  = scalar($pdo, "SELECT COUNT(*) FROM payments WHERE estado='pendiente' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
-$ticketPromedioMes   = scalar($pdo, "SELECT IFNULL(AVG(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
-$nuevosUsuariosMes   = scalar($pdo, "SELECT COUNT(*) FROM users WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
+/* ================= KPIs principales ================= */
+$usuariosTotal      = scalar($pdo, "SELECT COUNT(*) FROM users");
+$clientesTotal      = scalar($pdo, "SELECT COUNT(*) FROM users WHERE role='cliente'");
+$planesTotal        = scalar($pdo, "SELECT COUNT(*) FROM plans");
 
-// ========== Datos para gráficas ==========
+$subsActivas        = scalar($pdo, "SELECT COUNT(*) FROM subscriptions WHERE estado='activa'");
+$subsPendientes     = scalar($pdo, "SELECT COUNT(*) FROM subscriptions WHERE estado='pendiente'");
+
+$ingresosMes        = scalar($pdo, "SELECT IFNULL(SUM(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())", []);
+$pagosPendientesMes = scalar($pdo, "SELECT COUNT(*) FROM payments WHERE estado='pendiente' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())", []);
+$ticketPromMes      = scalar($pdo, "SELECT IFNULL(AVG(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())", []);
+$nuevosUsuariosMes  = scalar($pdo, "SELECT COUNT(*) FROM users WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())", []);
+
+/* KPIs opcionales según tablas (no fallan si no hay datos) */
+$estacionesOperativas = scalar($pdo, "SELECT COUNT(*) FROM stations WHERE estado='operativa'", [], 0);
+$bicisOperativas      = scalar($pdo, "SELECT COUNT(*) FROM bikes WHERE estado='operativa'", [], 0);
+$viajesMes            = scalar($pdo, "SELECT COUNT(*) FROM trips WHERE YEAR(start_at)=YEAR(CURDATE()) AND MONTH(start_at)=MONTH(CURDATE())", [], 0);
+
+/* CO2 del mes (si existe settings/trips) */
+$factor = (float) scalar($pdo, "SELECT `value` FROM settings WHERE `key`='co2_factor_kg_km'", [], 0.21);
+$co2Mes = scalar(
+    $pdo,
+    "SELECT IFNULL(SUM(CASE WHEN co2_kg>0 THEN co2_kg ELSE distancia_km*? END),0)
+     FROM trips WHERE YEAR(start_at)=YEAR(CURDATE()) AND MONTH(start_at)=MONTH(CURDATE())",
+    [$factor],
+    0.0
+);
+
+/* ================= Datos para gráficas ================= */
+// Pagos completados últimos 6 meses
 $pagos6 = rows($pdo, "
   SELECT DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH),'%Y-%m') ym,
          IFNULL((
-            SELECT SUM(monto) FROM payments
-            WHERE estado='completado'
-              AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH),'%Y-%m')
+           SELECT SUM(monto) FROM payments
+           WHERE estado='completado'
+             AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH),'%Y-%m')
          ),0) total
-  FROM (SELECT 0 seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5) m
+  FROM (SELECT 5 seq UNION ALL SELECT 4 UNION ALL SELECT 3 UNION ALL SELECT 2 UNION ALL SELECT 1 UNION ALL SELECT 0) m
   ORDER BY ym
 ");
 $labelsPagos = array_column($pagos6, 'ym');
 $dataPagos   = array_map(fn($r) => round((float)$r['total'], 2), $pagos6);
 
+// Suscripciones por estado
 $subsEstados = rows($pdo, "SELECT estado, COUNT(*) qty FROM subscriptions GROUP BY estado");
 $labelsSubs  = array_column($subsEstados, 'estado');
 $dataSubs    = array_map(fn($r) => (int)$r['qty'], $subsEstados);
 
+// Top planes por cantidad de suscripciones
 $topPlanes = rows($pdo, "
   SELECT p.nombre, COUNT(*) qty
   FROM subscriptions s
@@ -78,7 +91,7 @@ $topPlanes = rows($pdo, "
 $labelsTopPlanes = array_column($topPlanes, 'nombre');
 $dataTopPlanes   = array_map(fn($r) => (int)$r['qty'], $topPlanes);
 
-// ========== Listados ==========
+/* ================= Listados ================= */
 $ultimosPagos = rows($pdo, "
   SELECT p.id, p.monto, p.metodo, p.referencia, p.estado, p.created_at,
          u.name AS usuario, pl.nombre AS plan
@@ -86,14 +99,16 @@ $ultimosPagos = rows($pdo, "
   JOIN subscriptions s ON s.id=p.subscription_id
   JOIN users u ON u.id=s.user_id
   JOIN plans pl ON pl.id=s.plan_id
-  ORDER BY p.created_at DESC LIMIT 8
+  ORDER BY p.created_at DESC
+  LIMIT 8
 ");
 $ultimasSubs = rows($pdo, "
   SELECT s.id, u.name usuario, pl.nombre plan, s.estado, s.fecha_inicio, s.fecha_fin, s.created_at
   FROM subscriptions s
   JOIN users u ON u.id=s.user_id
   JOIN plans pl ON pl.id=s.plan_id
-  ORDER BY s.created_at DESC LIMIT 8
+  ORDER BY s.created_at DESC
+  LIMIT 8
 ");
 $resumenPlanes = rows($pdo, "
   SELECT p.id, p.nombre, p.precio,
@@ -111,14 +126,18 @@ $resumenPlanes = rows($pdo, "
     <meta charset="utf-8">
     <title>EcoBici • Admin • Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- CSS/JS de terceros -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <!-- Estilos -->
     <style>
         :root {
             --ring: #e2e8f0;
             --muted: #64748b;
             --bg: #f8fafc;
+            --green: #16a34a;
+            --green2: #22c55e;
         }
 
         body {
@@ -129,17 +148,17 @@ $resumenPlanes = rows($pdo, "
             background: #fff;
             border: 1px solid var(--ring);
             border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(2, 6, 23, .06)
+            box-shadow: 0 10px 30px rgba(2, 6, 23, .06);
         }
 
         .muted {
-            color: var(--muted) !important
+            color: var(--muted) !important;
         }
 
         .stat {
             font-weight: 800;
             font-size: clamp(1.25rem, 2.1vw + .25rem, 2rem);
-            line-height: 1
+            line-height: 1;
         }
 
         .chart-box {
@@ -147,16 +166,21 @@ $resumenPlanes = rows($pdo, "
         }
 
         .table thead th {
-            white-space: nowrap
+            white-space: nowrap;
         }
 
         .table td {
-            vertical-align: middle
+            vertical-align: middle;
+        }
+
+        .kpi i {
+            color: #16a34a;
         }
 
         @media (max-width: 991.98px) {
-            .btn-sm {
-                white-space: nowrap
+            .nav-link {
+                padding: .55rem 1rem;
+                margin: .25rem 0;
             }
         }
     </style>
@@ -172,27 +196,33 @@ $resumenPlanes = rows($pdo, "
         <div class="row g-3">
             <?php
             $kpis = [
-                ['Usuarios', 'bi-people', $usuariosTotal, 'Totales'],
-                ['Clientes', 'bi-person-check', $clientesTotal, 'Registrados'],
-                ['Planes', 'bi-badge-ad', $planesTotal, 'Disponibles'],
-                ['Subs. activas', 'bi-check2-circle', $subsActivas, 'En curso'],
-                ['Ingresos mes', 'bi-cash-coin', 'Q ' . number_format($ingresosMes, 2), 'Mes ' . date('m/Y')],
-                ['Ticket prom.', 'bi-receipt', 'Q ' . number_format($ticketPromedioMes, 2), 'Mes actual'],
-                ['Pagos pend.', 'bi-hourglass-split', $pagosPendientesMes, 'Este mes'],
-                ['Usuarios (mes)', 'bi-calendar-plus', $nuevosUsuariosMes, 'Nuevos'],
+                ['Usuarios',        'bi-people',          $usuariosTotal,               'Totales'],
+                ['Clientes',        'bi-person-check',    $clientesTotal,               'Registrados'],
+                ['Planes',          'bi-badge-ad',        $planesTotal,                 'Disponibles'],
+                ['Subs. activas',   'bi-check2-circle',   $subsActivas,                 'En curso'],
+
+                ['Ingresos mes',    'bi-cash-coin',      'Q ' . number_format($ingresosMes, 2), 'Mes ' . date('m/Y')],
+                ['Ticket prom.',    'bi-receipt',        'Q ' . number_format($ticketPromMes, 2), 'Mes actual'],
+                ['Pagos pend.',     'bi-hourglass-split', $pagosPendientesMes,          'Este mes'],
+                ['Usuarios (mes)',  'bi-calendar-plus',   $nuevosUsuariosMes,           'Nuevos'],
+
+                ['Estaciones OK',   'bi-geo-alt',         $estacionesOperativas,        'Operativas'],
+                ['Bicis OK',        'bi-bicycle',         $bicisOperativas,             'Operativas'],
+                ['Viajes (mes)',    'bi-flag',            $viajesMes,                   'Completados'],
+                ['CO₂ (mes)',       'bi-cloud-check',     number_format((float)$co2Mes, 2) . ' kg', 'Factor ' . rtrim(rtrim((string)$factor, '0'), '.')],
             ];
             foreach ($kpis as $k): ?>
                 <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="card-elev p-3 h-100">
+                    <div class="card-elev p-3 h-100 kpi">
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="muted"><?= e($k[0]) ?></span>
-                            <i class="bi <?= e($k[1]) ?> fs-4 text-success"></i>
+                            <i class="bi <?= e($k[1]) ?> fs-4"></i>
                         </div>
                         <div class="stat mt-2">
-                            <?php if (is_numeric($k[2])): ?>
-                                <span class="count" data-target="<?= (float)$k[2] ?>">0</span>
+                            <?php if (is_numeric(str_replace(['Q ', ' ', ',', '.'], '', $k[2]))): ?>
+                                <span class="count" data-target="<?= (float)filter_var($k[2], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION) ?>">0</span>
                             <?php else: ?>
-                                <?= $k[2] ?>
+                                <?= e($k[2]) ?>
                             <?php endif; ?>
                         </div>
                         <small class="muted"><?= e($k[3]) ?></small>
@@ -357,9 +387,10 @@ $resumenPlanes = rows($pdo, "
         <p class="mt-4 muted">EcoBici Puerto Barrios • Dashboard Bootstrap responsivo.</p>
     </main>
 
+    <!-- JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Contadores
+        // Contadores animados
         function animateCount(el) {
             const t = parseFloat(el.dataset.target || el.textContent || '0');
             if (!isFinite(t)) return;
@@ -376,13 +407,13 @@ $resumenPlanes = rows($pdo, "
         }
         document.querySelectorAll('.count').forEach(animateCount);
 
-        // Charts
-        const labelsPagos = <?= json_encode($labelsPagos) ?>;
-        const dataPagos = <?= json_encode($dataPagos) ?>;
-        const labelsSubs = <?= json_encode($labelsSubs ?: ['activa', 'pendiente', 'inactiva']) ?>;
-        const dataSubs = <?= json_encode($dataSubs ?: [0, 0, 0]) ?>;
-        const labelsTop = <?= json_encode($labelsTopPlanes) ?>;
-        const dataTop = <?= json_encode($dataTopPlanes) ?>;
+        // Datos PHP -> JS
+        const labelsPagos = <?= json_encode($labelsPagos, JSON_UNESCAPED_UNICODE) ?>;
+        const dataPagos = <?= json_encode($dataPagos, JSON_UNESCAPED_UNICODE) ?>;
+        const labelsSubs = <?= json_encode($labelsSubs ?: ['activa', 'pendiente', 'inactiva'], JSON_UNESCAPED_UNICODE) ?>;
+        const dataSubs = <?= json_encode($dataSubs ?: [0, 0, 0], JSON_UNESCAPED_UNICODE) ?>;
+        const labelsTop = <?= json_encode($labelsTopPlanes, JSON_UNESCAPED_UNICODE) ?>;
+        const dataTop = <?= json_encode($dataTopPlanes, JSON_UNESCAPED_UNICODE) ?>;
 
         const common = {
             responsive: true,

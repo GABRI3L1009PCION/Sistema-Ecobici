@@ -13,21 +13,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pairs = [
             'co2_factor_kg_km' => trim($_POST['co2_factor_kg_km'] ?? '0.21'),
-            'points_per_km'    => trim($_POST['points_per_km'] ?? '1'),
+            'brand_name'       => trim($_POST['brand_name'] ?? 'EcoBici'),
+            'contact_email'    => trim($_POST['contact_email'] ?? '')
         ];
-        $st = $pdo->prepare("INSERT INTO settings(`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)");
         foreach ($pairs as $k => $v) {
+            $st = $pdo->prepare("INSERT INTO settings(`key`,`value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=VALUES(`value`)");
             $st->execute([$k, $v]);
         }
-        flash('Ajustes guardados.');
+        flash('Ajustes guardados');
     } catch (Throwable $e) {
         flash($e->getMessage(), 'danger');
     }
     redirect('/ecobici/administrador/ajustes.php');
 }
-
-$co2 = $pdo->query("SELECT `value` FROM settings WHERE `key`='co2_factor_kg_km'")->fetchColumn() ?: '0.21';
-$pts = $pdo->query("SELECT `value` FROM settings WHERE `key`='points_per_km'")->fetchColumn() ?: '1';
+$rows = $pdo->query("SELECT `key`,`value` FROM settings")->fetchAll(PDO::FETCH_KEY_PAIR);
 ?>
 <!doctype html>
 <html lang="es">
@@ -39,27 +38,34 @@ $pts = $pdo->query("SELECT `value` FROM settings WHERE `key`='points_per_km'")->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
-<body>
-    <?php admin_nav('ajustes'); ?>
-    <main class="container py-4">
-        <?php if ($f = flash()): ?><div class="alert alert-<?= e($f['type']) ?>"><?= e($f['msg']) ?></div><?php endif; ?>
-        <h4 class="mb-3">Ajustes</h4>
-        <form method="post" class="p-3 border rounded-3">
-            <input type="hidden" name="_csrf" value="<?= e(csrf()) ?>">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <label class="form-label">Factor CO₂ (kg por km)</label>
-                    <input name="co2_factor_kg_km" class="form-control" value="<?= e($co2) ?>" required>
-                    <small class="text-muted">Se usa para calcular CO₂ evitado: <code>km * factor</code></small>
+<body><?php admin_nav('settings'); ?>
+    <main class="container py-4"><?php admin_flash(flash()); ?>
+        <h4 class="mb-3">Ajustes del sistema</h4>
+        <div class="card p-3">
+            <form method="post"><?= csrf_field() ?>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Factor CO₂ (kg por km)</label>
+                        <input class="form-control" name="co2_factor_kg_km" type="number" step="0.001" value="<?= e($rows['co2_factor_kg_km'] ?? '0.21') ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre de marca</label>
+                        <input class="form-control" name="brand_name" value="<?= e($rows['brand_name'] ?? 'EcoBici') ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Correo de contacto</label>
+                        <input class="form-control" type="email" name="contact_email" value="<?= e($rows['contact_email'] ?? '') ?>">
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Puntos por km</label>
-                    <input name="points_per_km" class="form-control" value="<?= e($pts) ?>" required>
+                <div class="mt-3">
+                    <button class="btn btn-success">Guardar</button>
                 </div>
-            </div>
-            <div class="mt-3"><button class="btn btn-success">Guardar</button></div>
-        </form>
+            </form>
+        </div>
     </main>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
+</html>
 
 </html>

@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/admin_boot.php';
-
 function e($v)
 {
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
@@ -11,20 +10,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('Token inválido', 'danger');
         redirect('/ecobici/administrador/estaciones.php');
     }
-    $action = $_POST['action'] ?? '';
     try {
-        if ($action === 'create') {
-            $st = $pdo->prepare("INSERT INTO stations(nombre,tipo,lat,lng,capacidad) VALUES(?,?,?,?,?)");
-            $st->execute([trim($_POST['nombre']), $_POST['tipo'], (float)$_POST['lat'], (float)$_POST['lng'], (int)$_POST['capacidad']]);
-            flash('Estación creada.');
-        } elseif ($action === 'update') {
-            $st = $pdo->prepare("UPDATE stations SET nombre=?, tipo=?, lat=?, lng=?, capacidad=? WHERE id=?");
-            $st->execute([trim($_POST['nombre']), $_POST['tipo'], (float)$_POST['lat'], (float)$_POST['lng'], (int)$_POST['capacidad'], (int)$_POST['id']]);
-            flash('Estación actualizada.');
-        } elseif ($action === 'delete') {
+        $a = $_POST['action'] ?? '';
+        if ($a === 'create') {
+            $nombre = trim($_POST['nombre'] ?? '');
+            $direccion = trim($_POST['direccion'] ?? '');
+            $lat = ($_POST['lat'] !== '') ? (float)$_POST['lat'] : null;
+            $lng = ($_POST['lng'] !== '') ? (float)$_POST['lng'] : null;
+            $estado = in_array($_POST['estado'] ?? 'operativa', ['operativa', 'mantenimiento', 'cerrada'], true) ? $_POST['estado'] : 'operativa';
+            if ($nombre === '') throw new Exception('Nombre requerido');
+            $st = $pdo->prepare("INSERT INTO stations(nombre,direccion,lat,lng,estado) VALUES(?,?,?,?,?)");
+            $st->execute([$nombre, $direccion, $lat, $lng, $estado]);
+            flash('Estación creada');
+        } elseif ($a === 'update') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new Exception('ID inválido');
+            $nombre = trim($_POST['nombre'] ?? '');
+            $direccion = trim($_POST['direccion'] ?? '');
+            $lat = ($_POST['lat'] !== '') ? (float)$_POST['lat'] : null;
+            $lng = ($_POST['lng'] !== '') ? (float)$_POST['lng'] : null;
+            $estado = in_array($_POST['estado'] ?? 'operativa', ['operativa', 'mantenimiento', 'cerrada'], true) ? $_POST['estado'] : 'operativa';
+            if ($nombre === '') throw new Exception('Nombre requerido');
+            $st = $pdo->prepare("UPDATE stations SET nombre=?,direccion=?,lat=?,lng=?,estado=? WHERE id=?");
+            $st->execute([$nombre, $direccion, $lat, $lng, $estado, $id]);
+            flash('Estación actualizada');
+        } elseif ($a === 'delete') {
+            $id = (int)($_POST['id'] ?? 0);
+            if ($id <= 0) throw new Exception('ID inválido');
+            // Evita borrar si tiene bicis
+            $c = (int)$pdo->query("SELECT COUNT(*) FROM bikes WHERE station_id=" . $id)->fetchColumn();
+            if ($c > 0) throw new Exception('No puedes eliminar: tiene bicicletas asignadas.');
             $st = $pdo->prepare("DELETE FROM stations WHERE id=?");
-            $st->execute([(int)$_POST['id']]);
-            flash('Estación eliminada.');
+            $st->execute([$id]);
+            flash('Estación eliminada');
         }
     } catch (Throwable $e) {
         flash($e->getMessage(), 'danger');
@@ -32,7 +50,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('/ecobici/administrador/estaciones.php');
 }
 
-$rows = $pdo->query("SELECT * FROM stations ORDER BY id DESC")->fetchAll(PDO::FETCH_ASSOC);
+$q = trim($_GET['q'] ?? '');
+$estado = trim($_GET['estado'] ?? '');
+$where = [];
+$args = [];
+if ($q !== '') {
+    $where[] = "(nombre LIKE ? OR direccion LIKE ?)";
+    $args[] = "%$q%";
+    $args[] = "%$q%";
+}
+if ($estado !== '' && in_array($estado, ['operativa', 'mantenimiento', 'cerrada'], true)) {
+    $where[] = "estado=?";
+    $args[] = $estado;
+}
+$wsql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
+$rows = $pdo->prepare("SELECT id,nombre,direccion,lat,lng,estado,created_at FROM stations $wsql ORDER BY nombre ASC");
+$rows->execute($args);
+$estaciones = $rows->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!doctype html>
 <html lang="es">
@@ -43,93 +77,90 @@ $rows = $pdo->query("SELECT * FROM stations ORDER BY id DESC")->fetchAll(PDO::FE
     <title>EcoBici • Estaciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        .card-elev {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(2, 6, 23, .06)
-        }
-    </style>
 </head>
 
-<body>
-    <?php admin_nav('estaciones'); ?>
-    <main class="container py-4">
-        <?php if ($f = flash()): ?><div class="alert alert-<?= e($f['type']) ?>"><?= e($f['msg']) ?></div><?php endif; ?>
-
+<body><?php admin_nav('stations'); ?>
+    <main class="container py-4"><?php admin_flash(flash()); ?>
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 class="mb-0">Estaciones</h4>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#mdlCreate"><i class="bi bi-plus-lg me-1"></i>Nueva</button>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#mdlCreate"><i class="bi bi-plus-lg me-1"></i>Nueva estación</button>
         </div>
+        <form class="row g-2 mb-3">
+            <div class="col-md"><input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Buscar..."></div>
+            <div class="col-md">
+                <select class="form-select" name="estado">
+                    <option value="">Estado...</option>
+                    <?php foreach (['operativa', 'mantenimiento', 'cerrada'] as $es): ?>
+                        <option value="<?= $es ?>" <?= $estado === $es ? 'selected' : '' ?>><?= ucfirst($es) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-auto"><button class="btn btn-outline-success">Aplicar</button></div>
+            <div class="col-auto"><a class="btn btn-outline-secondary" href="/ecobici/administrador/estaciones.php">Limpiar</a></div>
+        </form>
 
-        <div class="card-elev p-3">
+        <div class="card p-3">
             <div class="table-responsive">
                 <table class="table align-middle">
                     <thead>
                         <tr>
                             <th>ID</th>
                             <th>Nombre</th>
-                            <th>Tipo</th>
-                            <th>Lat</th>
-                            <th>Lng</th>
-                            <th>Capacidad</th>
+                            <th>Dirección</th>
+                            <th>Lat/Lng</th>
+                            <th>Estado</th>
                             <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if ($rows): foreach ($rows as $r): ?>
-                                <tr>
-                                    <td>#<?= e($r['id']) ?></td>
-                                    <td class="fw-semibold"><?= e($r['nombre']) ?></td>
-                                    <td><span class="badge text-bg-secondary"><?= e($r['tipo']) ?></span></td>
-                                    <td class="small"><?= e($r['lat']) ?></td>
-                                    <td class="small"><?= e($r['lng']) ?></td>
-                                    <td><?= e($r['capacidad']) ?></td>
-                                    <td class="text-end">
-                                        <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#mdlEdit"
-                                            data-id="<?= $r['id'] ?>" data-nombre="<?= e($r['nombre']) ?>" data-tipo="<?= $r['tipo'] ?>"
-                                            data-lat="<?= $r['lat'] ?>" data-lng="<?= $r['lng'] ?>" data-cap="<?= $r['capacidad'] ?>"><i class="bi bi-pencil"></i></button>
-                                        <form class="d-inline" method="post" onsubmit="return confirm('¿Eliminar estación?');">
-                                            <input type="hidden" name="_csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $r['id'] ?>">
-                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <?php endforeach;
-                        else: ?>
+                        <?php if (!$estaciones): ?><tr>
+                                <td colspan="6" class="text-center text-muted">Sin estaciones</td>
+                            </tr><?php endif; ?>
+                        <?php foreach ($estaciones as $s): ?>
                             <tr>
-                                <td colspan="7" class="text-center text-muted">Sin estaciones</td>
-                            </tr>
-                        <?php endif; ?>
+                                <td>#<?= e($s['id']) ?></td>
+                                <td class="fw-semibold"><?= e($s['nombre']) ?></td>
+                                <td class="small text-muted"><?= e($s['direccion'] ?? '—') ?></td>
+                                <td class="small"><?= e($s['lat'] !== null ? $s['lat'] : '—') ?> / <?= e($s['lng'] !== null ? $s['lng'] : '—') ?></td>
+                                <td><span class="badge text-bg-<?= $s['estado'] === 'operativa' ? 'success' : ($s['estado'] === 'mantenimiento' ? 'warning' : 'secondary') ?>"><?= e($s['estado']) ?></span></td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-success me-1" data-bs-toggle="modal" data-bs-target="#mdlEdit"
+                                        data-id="<?= e($s['id']) ?>" data-nombre="<?= e($s['nombre']) ?>" data-direccion="<?= e($s['direccion']) ?>"
+                                        data-lat="<?= e($s['lat']) ?>" data-lng="<?= e($s['lng']) ?>" data-estado="<?= e($s['estado']) ?>">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form class="d-inline" method="post" onsubmit="return confirm('¿Eliminar esta estación?');">
+                                        <?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= e($s['id']) ?>">
+                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr><?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
         </div>
     </main>
 
-    <!-- Crear -->
+    <!-- Modales -->
     <div class="modal fade" id="mdlCreate" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="post">
-                    <input type="hidden" name="_csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="create">
+                <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="create">
                     <div class="modal-header">
                         <h5 class="modal-title">Nueva estación</h5><button class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body vstack gap-3">
-                        <div><label class="form-label">Nombre</label><input name="nombre" class="form-control" required></div>
+                    <div class="modal-body vstack gap-2">
+                        <input class="form-control" name="nombre" placeholder="Nombre" required>
+                        <input class="form-control" name="direccion" placeholder="Dirección">
                         <div class="row g-2">
-                            <div class="col-sm-4"><label class="form-label">Tipo</label>
-                                <select name="tipo" class="form-select">
-                                    <option value="dock">dock</option>
-                                    <option value="punto">punto</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-4"><label class="form-label">Lat</label><input type="number" step="0.0000001" name="lat" class="form-control" required></div>
-                            <div class="col-sm-4"><label class="form-label">Lng</label><input type="number" step="0.0000001" name="lng" class="form-control" required></div>
+                            <div class="col"><input class="form-control" name="lat" placeholder="Lat"></div>
+                            <div class="col"><input class="form-control" name="lng" placeholder="Lng"></div>
                         </div>
-                        <div><label class="form-label">Capacidad</label><input type="number" name="capacidad" class="form-control" value="10" min="1" required></div>
+                        <select class="form-select" name="estado">
+                            <option value="operativa">Operativa</option>
+                            <option value="mantenimiento">Mantenimiento</option>
+                            <option value="cerrada">Cerrada</option>
+                        </select>
                     </div>
                     <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-success">Guardar</button></div>
                 </form>
@@ -137,29 +168,25 @@ $rows = $pdo->query("SELECT * FROM stations ORDER BY id DESC")->fetchAll(PDO::FE
         </div>
     </div>
 
-    <!-- Editar -->
     <div class="modal fade" id="mdlEdit" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="post">
-                    <input type="hidden" name="_csrf" value="<?= e(csrf()) ?>"><input type="hidden" name="action" value="update">
-                    <input type="hidden" name="id" id="edit_id">
+                <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="update"><input type="hidden" name="id" id="e_id">
                     <div class="modal-header">
                         <h5 class="modal-title">Editar estación</h5><button class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
-                    <div class="modal-body vstack gap-3">
-                        <div><label class="form-label">Nombre</label><input name="nombre" id="edit_nombre" class="form-control" required></div>
+                    <div class="modal-body vstack gap-2">
+                        <input class="form-control" name="nombre" id="e_nombre" required>
+                        <input class="form-control" name="direccion" id="e_direccion">
                         <div class="row g-2">
-                            <div class="col-sm-4"><label class="form-label">Tipo</label>
-                                <select name="tipo" id="edit_tipo" class="form-select">
-                                    <option value="dock">dock</option>
-                                    <option value="punto">punto</option>
-                                </select>
-                            </div>
-                            <div class="col-sm-4"><label class="form-label">Lat</label><input type="number" step="0.0000001" name="lat" id="edit_lat" class="form-control" required></div>
-                            <div class="col-sm-4"><label class="form-label">Lng</label><input type="number" step="0.0000001" name="lng" id="edit_lng" class="form-control" required></div>
+                            <div class="col"><input class="form-control" name="lat" id="e_lat"></div>
+                            <div class="col"><input class="form-control" name="lng" id="e_lng"></div>
                         </div>
-                        <div><label class="form-label">Capacidad</label><input type="number" name="capacidad" id="edit_cap" class="form-control" min="1" required></div>
+                        <select class="form-select" name="estado" id="e_estado">
+                            <option value="operativa">Operativa</option>
+                            <option value="mantenimiento">Mantenimiento</option>
+                            <option value="cerrada">Cerrada</option>
+                        </select>
                     </div>
                     <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-success">Actualizar</button></div>
                 </form>
@@ -171,14 +198,16 @@ $rows = $pdo->query("SELECT * FROM stations ORDER BY id DESC")->fetchAll(PDO::FE
     <script>
         document.getElementById('mdlEdit')?.addEventListener('show.bs.modal', e => {
             const b = e.relatedTarget;
-            edit_id.value = b.dataset.id;
-            edit_nombre.value = b.dataset.nombre;
-            edit_tipo.value = b.dataset.tipo;
-            edit_lat.value = b.dataset.lat;
-            edit_lng.value = b.dataset.lng;
-            edit_cap.value = b.dataset.cap;
+            e_id.value = b.dataset.id;
+            e_nombre.value = b.dataset.nombre || '';
+            e_direccion.value = b.dataset.direccion || '';
+            e_lat.value = b.dataset.lat || '';
+            e_lng.value = b.dataset.lng || '';
+            e_estado.value = b.dataset.estado || 'operativa';
         });
     </script>
 </body>
+
+</html>
 
 </html>
