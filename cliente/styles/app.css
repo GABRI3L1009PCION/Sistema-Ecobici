@@ -212,3 +212,17 @@ body.ecobici {
   color: #fff;
   border-color: var(--eco-primary);
 }
+
+/* ===== Gráficos (Mi CO2) ===== */
+.co2-grid .eco-card { height: 100%; }            /* tarjetas uniformes */
+.chart-box {
+  height: 260px;                                 /* alto fijo y controlado */
+  max-height: 260px;
+  position: relative;
+}
+.chart-box-sm { height: 240px; max-height: 240px; }
+.chart-canvas {
+  width: 100% !important;
+  height: 100% !important;                       /* que respete el alto del contenedor */
+  display: block;
+}
