@@ -1,0 +1,214 @@
+/* ================= EcoBici Theme ================= */
+:root{
+  --eco-bg: #f4fff6;            /* fondo suave */
+  --eco-card: #ffffff;          /* card */
+  --eco-border: #d7f5df;        /* borde suave */
+  --eco-primary: #18a751;       /* verde principal */
+  --eco-primary-600:#128a42;    /* verde oscuro */
+  --eco-primary-100:#e9f9ee;    /* verde claro */
+  --eco-muted:#6a7c6e;          /* texto secundario */
+  --eco-shadow: 0 8px 20px rgba(24,167,81,.08);
+}
+
+body.ecobici {
+  background: var(--eco-bg);
+  color:#1c2a22;
+}
+
+/* Títulos y utilidades */
+.eco-title{ font-weight: 800; letter-spacing:.2px; color: var(--eco-primary); }
+.eco-muted{ color: var(--eco-muted); }
+.eco-badge{ background: var(--eco-primary-100); color: var(--eco-primary-600); border-radius: 999px; font-weight:600; }
+
+/* Cards */
+.eco-card{
+  background: var(--eco-card);
+  border:1px solid var(--eco-border);
+  border-radius:16px;
+  box-shadow: var(--eco-shadow);
+}
+.eco-card .card-body{ padding: 1.25rem; }
+
+/* Botones */
+.btn-eco{ background: var(--eco-primary); color:#fff; border:none; }
+.btn-eco:hover{ background: var(--eco-primary-600); color:#fff; }
+.btn-eco-outline{ border:1px solid var(--eco-primary); color:var(--eco-primary); background:#fff; }
+.btn-eco-outline:hover{ background: var(--eco-primary); color:#fff; }
+.pill{ border-radius: 999px; }
+
+/* Inputs */
+.form-control, .form-select{
+  border:1px solid var(--eco-border);
+  border-radius: 12px;
+}
+.form-control:focus, .form-select:focus{
+  border-color: var(--eco-primary);
+  box-shadow: 0 0 0 .25rem rgba(24,167,81,.15);
+}
+
+/* Mapa */
+#map{
+  height: 72vh;
+  border:1px solid var(--eco-border);
+  border-radius:16px;
+}
+
+/* Listado lateral */
+.eco-list {
+  max-height: 220px;
+  overflow: auto;
+}
+.eco-list-item{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:.4rem .6rem; border:1px dashed var(--eco-border);
+  border-radius: 12px; background:#fff;
+}
+
+/* Separador suave */
+.eco-hr{ border:0; height:1px; background: var(--eco-border); opacity:1; }
+
+/* Resumen */
+.eco-summary{ border:1px solid var(--eco-border); border-radius:14px; padding:1rem; background:#fff; }
+.eco-summary .row > div{ display:flex; justify-content:space-between; }
+
+/* Fondo y tipografía */
+body.ecobici {
+  background-color: #f4fff6;
+  color: #333;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Título principal */
+.eco-title {
+  font-weight: 700;
+  font-size: 1.8rem;
+  color: #18a751;
+}
+
+/* Card general */
+.eco-card {
+  background: #fff;
+  border: 1px solid #d7f5df;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.05);
+}
+
+/* Botones */
+.btn-eco {
+  background: #18a751;
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.btn-eco:hover { background: #128a42; color: #fff; }
+
+.btn-eco-outline {
+  border: 1px solid #18a751;
+  color: #18a751;
+  border-radius: 999px;
+}
+.btn-eco-outline:hover { background: #18a751; color: #fff; }
+
+/* Inputs */
+.form-control, .form-select {
+  border-radius: 12px;
+  border: 1px solid #d7f5df;
+}
+.form-control:focus, .form-select:focus {
+  border-color: #18a751;
+  box-shadow: 0 0 0 .2rem rgba(24,167,81,.15);
+}
+
+/* Resumen */
+.eco-summary {
+  background: #fff;
+  border: 1px solid #d7f5df;
+  border-radius: 14px;
+  padding: 1rem;
+}
+.eco-summary strong { color: #18a751; }
+
+/* Lista estaciones */
+.eco-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .5rem .8rem;
+  border: 1px dashed #d7f5df;
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* ====== Modo compacto para Rutas ====== */
+.eco-tight .row { --bs-gutter-x: .75rem; --bs-gutter-y: .75rem; }
+.eco-tight .eco-card .card-body { padding: .9rem; }       /* menos padding */
+.eco-tight .form-control, .eco-tight .form-select {       /* campos más bajos */
+  padding: .35rem .6rem; height: 38px;
+}
+.eco-tight .btn { padding: .35rem .8rem; font-size: .95rem; }
+.eco-tight .eco-summary { padding: .75rem; }
+
+/* Panel lateral siempre visible en desktop */
+.sticky-panel { position: sticky; top: 12px; }
+
+/* Altura del mapa más baja para evitar scroll innecesario */
+#map { height: 60vh; } /* antes 72vh */
+@media (max-width: 992px){
+  #map { height: 55vh; }
+}
+@media (max-width: 576px){
+  #map { height: 50vh; }
+}
+
+/* Lista de estaciones más densa */
+.eco-list { max-height: 180px; }
+.eco-list-item { padding: .35rem .55rem; font-size: .95rem; }
+
+/* Título más compacto */
+.eco-title { font-size: 1.6rem; }
+
+/* ===== Encabezados de páginas ===== */
+.eco-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.eco-header-left {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.eco-header-icon {
+  font-size: 1.8rem;
+  color: var(--eco-primary);
+}
+
+.eco-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--eco-primary);
+  margin: 0;
+}
+
+/* Botón volver más elegante */
+.btn-back {
+  background: #fff;
+  border: 1px solid var(--eco-border);
+  border-radius: 999px;
+  color: var(--eco-primary);
+  padding: .35rem .9rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,.05);
+  transition: all .2s;
+}
+.btn-back:hover {
+  background: var(--eco-primary);
+  color: #fff;
+  border-color: var(--eco-primary);
+}
