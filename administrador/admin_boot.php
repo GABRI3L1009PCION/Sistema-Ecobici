@@ -101,16 +101,16 @@ if (!function_exists('admin_nav')) {
             ['key' => 'users',  'href' => '/ecobici/administrador/usuarios.php',      'icon' => 'bi-people',       'text' => 'Usuarios'],
             ['key' => 'subs',   'href' => '/ecobici/administrador/suscripciones.php', 'icon' => 'bi-diagram-3',    'text' => 'Suscripciones'],
             ['key' => 'pagos',  'href' => '/ecobici/administrador/pagos.php',         'icon' => 'bi-cash-coin',    'text' => 'Pagos'],
-            // Puedes habilitar cuando crees estas vistas:
             // ['key'=>'rep_co2','href'=>'/ecobici/administrador/reportes_co2.php','icon'=>'bi-cloud-check','text'=>'CO₂'],
             // ['key'=>'ajustes','href'=>'/ecobici/administrador/ajustes.php',     'icon'=>'bi-gear',         'text'=>'Ajustes'],
         ];
 
-        // Estilos suaves verde/blanco
+        // Estilos suaves verde/blanco + ajuste de logo
         echo <<<CSS
 <style>
   .adminbar{border-bottom:1px solid #e2e8f0}
   .adminbar .navbar-brand{font-weight:700;letter-spacing:.2px}
+  .adminbar .navbar-brand img{height:38px}
   .adminbar .nav-link{color:#198754}
   .adminbar .nav-link:hover{color:#0a6f3c}
   .adminbar .nav-link.active{background:#16a34a;color:#fff!important;border-radius:999px;box-shadow:0 0 0 .12rem rgba(22,163,74,.18)}
@@ -120,28 +120,34 @@ CSS;
 
         // Navbar
         echo '<nav class="navbar navbar-expand-lg bg-white adminbar sticky-top">',
-        '<div class="container-fluid">',
-        '<a class="navbar-brand d-flex align-items-center gap-2" href="/ecobici/administrador/dashboard.php">',
-        '<i class="bi bi-bicycle text-success"></i> EcoBici Admin</a>',
-        '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav" aria-controls="adminNav" aria-expanded="false" aria-label="Menú">',
-        '<span class="navbar-toggler-icon"></span></button>',
-        '<div class="collapse navbar-collapse" id="adminNav">',
-        '<ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">';
+             '<div class="container-fluid">',
+
+             // ====== AQUÍ VA EL LOGO ======
+             '<a class="navbar-brand d-flex align-items-center gap-2" href="/ecobici/administrador/dashboard.php">',
+             '<img src="/ecobici/cliente/styles/logo.jpg" alt="EcoBici">',
+             '<span class="visually-hidden">EcoBici Admin</span>',
+             '</a>',
+
+             '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav" aria-controls="adminNav" aria-expanded="false" aria-label="Menú">',
+             '<span class="navbar-toggler-icon"></span></button>',
+
+             '<div class="collapse navbar-collapse" id="adminNav">',
+             '<ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">';
         foreach ($items as $it) {
             $is = ($active === $it['key']) ? ' active' : '';
             echo '<li class="nav-item">',
-            '<a class="nav-link px-3 py-2', $is, '" href="', e($it['href']), '">',
-            '<i class="bi ', e($it['icon']), ' me-1"></i>', e($it['text']),
-            '</a>',
-            '</li>';
+                 '<a class="nav-link px-3 py-2', $is, '" href="', e($it['href']), '">',
+                 '<i class="bi ', e($it['icon']), ' me-1"></i>', e($it['text']),
+                 '</a>',
+                 '</li>';
         }
-        echo        '</ul>',
-        '<div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">',
-        '<a class="btn btn-outline-success" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>',
-        '<a class="btn btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>',
-        '</div>',
-        '</div>',
-        '</div>',
-        '</nav>';
+        echo    '</ul>',
+                '<div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">',
+                '<a class="btn btn-outline-success" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>',
+                '<a class="btn btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>',
+                '</div>',
+                '</div>',
+                '</div>',
+                '</nav>';
     }
 }

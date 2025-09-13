@@ -32,7 +32,7 @@ try {
 <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top eco-navbar">
   <div class="container">
     <a class="navbar-brand fw-bold d-flex align-items-center gap-2 scrollto" href="#inicio">
-      <i class="fa-solid fa-bicycle"></i> EcoBici
+      <img src="/ecobici/cliente/styles/logo.jpg" alt="EcoBici" height="38">
     </a>
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav">
@@ -54,6 +54,7 @@ try {
     </div>
   </div>
 </nav>
+
 
 <!-- Hero -->
 <header id="inicio" class="section-pad">
@@ -258,12 +259,14 @@ try {
                 </ul>
                 <div class="mt-auto d-flex align-items-center justify-content-between">
                   <span class="price">Q <?= number_format((float)$p['precio'], 2) ?></span>
-                  <a class="btn btn-primary btn-animate" href="register.php?plan_id=<?= (int)$p['id'] ?>">Elegir</a>
                 </div>
               </div>
             </div>
           </div>
         <?php endforeach; ?>
+        <div class="col-12 text-center mt-4">
+  <a href="register.php" class="btn btn-lg btn-primary btn-animate">Registrarse</a>
+</div>
       <?php else: ?>
         <div class="col-12">
           <div class="alert alert-warning">No hay planes cargados todavía.</div>
