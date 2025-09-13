@@ -2,20 +2,23 @@
 // /ecobici/administrador/admin_boot.php
 declare(strict_types=1);
 
-session_start();
+// ---- Sesión y conexión ----
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/../config/db.php';
 
-// --- Guardas de acceso ---
+// ---- Guardas de acceso ----
 if (!isset($_SESSION['user']) || (($_SESSION['user']['role'] ?? null) !== 'admin')) {
     header('Location: /ecobici/login.php');
     exit;
 }
-if (!isset($pdo)) {
+if (!isset($pdo) || !$pdo instanceof PDO) {
     die('Error: $pdo no está definido. Revisa config/db.php');
 }
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-// ===================== Helpers básicos =====================
+// ================= Helpers básicos =================
 if (!function_exists('e')) {
     function e($v): string
     {
@@ -30,7 +33,7 @@ if (!function_exists('redirect')) {
     }
 }
 
-// --------------------- Flash messages ----------------------
+// ---------------- Flash messages -------------------
 if (!function_exists('flash')) {
     /**
      * flash() -> obtiene y limpia el flash activo
@@ -60,7 +63,7 @@ if (!function_exists('admin_flash')) {
     }
 }
 
-// --------------------- CSRF minimal ------------------------
+// ---------------- CSRF minimal ---------------------
 if (empty($_SESSION['_csrf'])) {
     $_SESSION['_csrf'] = bin2hex(random_bytes(16));
 }
@@ -84,20 +87,23 @@ if (!function_exists('csrf_field')) {
     }
 }
 
-// ===================== Navbar Admin ========================
+// ================= Navbar Admin ====================
 if (!function_exists('admin_nav')) {
     /**
      * Navbar Bootstrap del administrador
-     * @param string $active  'dash' | 'planes' | 'users' | 'subs' | 'pagos'
+     * @param string $active  'dash'|'planes'|'users'|'subs'|'pagos'|'rep_co2'|'ajustes'
      */
     function admin_nav(string $active = 'dash'): void
     {
         $items = [
-            ['key' => 'dash',  'href' => '/ecobici/administrador/dashboard.php',    'icon' => 'bi-speedometer2', 'text' => 'Dashboard'],
-            ['key' => 'planes', 'href' => '/ecobici/administrador/planes.php',       'icon' => 'bi-badge-ad',     'text' => 'Planes'],
-            ['key' => 'users', 'href' => '/ecobici/administrador/usuarios.php',     'icon' => 'bi-people',       'text' => 'Usuarios'],
-            ['key' => 'subs',  'href' => '/ecobici/administrador/suscripciones.php', 'icon' => 'bi-diagram-3',    'text' => 'Suscripciones'],
-            ['key' => 'pagos', 'href' => '/ecobici/administrador/pagos.php',        'icon' => 'bi-cash-coin',    'text' => 'Pagos'],
+            ['key' => 'dash',   'href' => '/ecobici/administrador/dashboard.php',     'icon' => 'bi-speedometer2', 'text' => 'Dashboard'],
+            ['key' => 'planes', 'href' => '/ecobici/administrador/planes.php',        'icon' => 'bi-badge-ad',     'text' => 'Planes'],
+            ['key' => 'users',  'href' => '/ecobici/administrador/usuarios.php',      'icon' => 'bi-people',       'text' => 'Usuarios'],
+            ['key' => 'subs',   'href' => '/ecobici/administrador/suscripciones.php', 'icon' => 'bi-diagram-3',    'text' => 'Suscripciones'],
+            ['key' => 'pagos',  'href' => '/ecobici/administrador/pagos.php',         'icon' => 'bi-cash-coin',    'text' => 'Pagos'],
+            // Puedes habilitar cuando crees estas vistas:
+            // ['key'=>'rep_co2','href'=>'/ecobici/administrador/reportes_co2.php','icon'=>'bi-cloud-check','text'=>'CO₂'],
+            // ['key'=>'ajustes','href'=>'/ecobici/administrador/ajustes.php',     'icon'=>'bi-gear',         'text'=>'Ajustes'],
         ];
 
         // Estilos suaves verde/blanco
@@ -121,20 +127,21 @@ CSS;
         '<span class="navbar-toggler-icon"></span></button>',
         '<div class="collapse navbar-collapse" id="adminNav">',
         '<ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">';
-
         foreach ($items as $it) {
             $is = ($active === $it['key']) ? ' active' : '';
             echo '<li class="nav-item">',
             '<a class="nav-link px-3 py-2', $is, '" href="', e($it['href']), '">',
             '<i class="bi ', e($it['icon']), ' me-1"></i>', e($it['text']),
-            '</a></li>';
+            '</a>',
+            '</li>';
         }
-
-        echo    '</ul>',
+        echo        '</ul>',
         '<div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">',
         '<a class="btn btn-outline-success" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>',
         '<a class="btn btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>',
         '</div>',
-        '</div></div></nav>';
+        '</div>',
+        '</div>',
+        '</nav>';
     }
 }

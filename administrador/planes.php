@@ -1,5 +1,40 @@
 <?php
+// /ecobici/administrador/planes.php
 require_once __DIR__ . '/admin_boot.php';
+
+/* =============== Helpers mínimos locales =============== */
+function e($v)
+{
+    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+}
+if (!function_exists('csrf_field')) {
+    function csrf_field()
+    {
+        return '<input type="hidden" name="_csrf" value="' . e(csrf()) . '">';
+    }
+}
+if (!function_exists('admin_flash')) {
+    function admin_flash($f)
+    {
+        if (!$f) return;
+        echo '<div class="alert alert-' . e($f['type']) . '">' . e($f['msg']) . '</div>';
+    }
+}
+function qurl(array $overrides = [])
+{
+    $q = array_merge($_GET, $overrides);
+    return '/ecobici/administrador/planes.php?' . http_build_query($q);
+}
+function sortLink($key, $label, $currentSort, $currentDir)
+{
+    $nextDir = ($currentSort === $key && $currentDir === 'asc') ? 'desc' : 'asc';
+    $url = qurl(['sort' => $key, 'dir' => $nextDir, 'page' => 1]);
+    $icon = '';
+    if ($currentSort === $key) {
+        $icon = $currentDir === 'asc' ? ' <i class="bi bi-caret-up-fill"></i>' : ' <i class="bi bi-caret-down-fill"></i>';
+    }
+    return '<a class="link-success text-decoration-none" href="' . e($url) . '">' . e($label) . $icon . '</a>';
+}
 
 /* =============== ACCIONES (POST) =============== */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -63,18 +98,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* =============== LISTADO con filtros/orden/paginación =============== */
-function e($v)
-{
-    return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
-}
-
 $q        = trim($_GET['q'] ?? '');
 $minPrice = trim($_GET['min'] ?? '');
 $maxPrice = trim($_GET['max'] ?? '');
 $page     = max(1, (int)($_GET['page'] ?? 1));
 $perPage  = 10;
 
-$allowedSort = ['nombre', 'precio', 'created_at', 'suscripciones']; // campos ordenables
+$allowedSort = ['id', 'nombre', 'precio', 'created_at', 'suscripciones']; // ← añadido 'id'
 $sort = $_GET['sort'] ?? 'precio';
 if (!in_array($sort, $allowedSort, true)) $sort = 'precio';
 
@@ -102,20 +132,18 @@ if ($maxPrice !== '' && is_numeric($maxPrice)) {
 }
 $wsql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
-// Para ordenar por suscripciones, ordenamos por COUNT(s.id)
+// Para ordenar por suscripciones, usamos el alias del COUNT
 $orderMap = [
-    'nombre'        => 'p.nombre',
-    'precio'        => 'p.precio',
-    'created_at'    => 'p.created_at',
-    'suscripciones' => 'suscripciones',
+    'id'             => 'p.id',          // ← añadido
+    'nombre'         => 'p.nombre',
+    'precio'         => 'p.precio',
+    'created_at'     => 'p.created_at',
+    'suscripciones'  => 'suscripciones',
 ];
 $orderBy = $orderMap[$sort] . ' ' . strtoupper($dir);
 
 // Total (con los mismos filtros)
-$sqlCount = "
-  SELECT COUNT(*) FROM plans p
-  $wsql
-";
+$sqlCount = "SELECT COUNT(*) FROM plans p $wsql";
 $st = $pdo->prepare($sqlCount);
 $st->execute($args);
 $total = (int)$st->fetchColumn();
@@ -136,24 +164,6 @@ $sql = "
 $st = $pdo->prepare($sql);
 $st->execute($args);
 $planes = $st->fetchAll(PDO::FETCH_ASSOC);
-
-// Construye URL con query preservando filtros
-function qurl(array $overrides = [])
-{
-    $q = array_merge($_GET, $overrides);
-    return '/ecobici/administrador/planes.php?' . http_build_query($q);
-}
-// Helpers de orden
-function sortLink($key, $label, $currentSort, $currentDir)
-{
-    $nextDir = ($currentSort === $key && $currentDir === 'asc') ? 'desc' : 'asc';
-    $url = qurl(['sort' => $key, 'dir' => $nextDir, 'page' => 1]);
-    $icon = '';
-    if ($currentSort === $key) {
-        $icon = $currentDir === 'asc' ? ' <i class="bi bi-caret-up-fill"></i>' : ' <i class="bi bi-caret-down-fill"></i>';
-    }
-    return '<a class="link-success text-decoration-none" href="' . e($url) . '">' . e($label) . $icon . '</a>';
-}
 ?>
 <!doctype html>
 <html lang="es">
@@ -186,6 +196,8 @@ function sortLink($key, $label, $currentSort, $currentDir)
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
+            line-clamp: 2;
+            /* estándar para quitar warning */
             overflow: hidden;
             color: var(--muted);
         }
@@ -318,7 +330,7 @@ function sortLink($key, $label, $currentSort, $currentDir)
                         $qs['page'] = max(1, $page - 1);
                         $prev  = qurl($qs);
                         $qs['page'] = min($pages, $page + 1);
-                        $next  = qurl($qs);
+                        $next = qurl($qs);
                         $qs['page'] = $pages;
                         $last  = qurl($qs);
                         ?>
@@ -408,7 +420,7 @@ function sortLink($key, $label, $currentSort, $currentDir)
         </div>
     </div>
 
-    <!-- Modal: ELIMINAR (confirmación bonita) -->
+    <!-- Modal: ELIMINAR -->
     <div class="modal fade" id="mdlDelete" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-sm">
             <div class="modal-content">
@@ -434,22 +446,19 @@ function sortLink($key, $label, $currentSort, $currentDir)
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Editar: carga datos al abrir modal
-        const mdlEdit = document.getElementById('mdlEdit');
-        mdlEdit?.addEventListener('show.bs.modal', e => {
+        // Editar: carga datos
+        document.getElementById('mdlEdit')?.addEventListener('show.bs.modal', e => {
             const b = e.relatedTarget;
-            document.getElementById('edit_id').value = b.dataset.id;
-            document.getElementById('edit_nombre').value = b.dataset.nombre;
-            document.getElementById('edit_precio').value = b.dataset.precio;
-            document.getElementById('edit_desc').value = b.dataset.desc || '';
+            edit_id.value = b.dataset.id;
+            edit_nombre.value = b.dataset.nombre || '';
+            edit_precio.value = b.dataset.precio || '';
+            edit_desc.value = b.dataset.desc || '';
         });
-
         // Eliminar: setea id y nombre
-        const mdlDelete = document.getElementById('mdlDelete');
-        mdlDelete?.addEventListener('show.bs.modal', e => {
+        document.getElementById('mdlDelete')?.addEventListener('show.bs.modal', e => {
             const b = e.relatedTarget;
-            document.getElementById('del_id').value = b.dataset.id;
-            document.getElementById('del_name').textContent = b.dataset.name || ('#' + b.dataset.id);
+            del_id.value = b.dataset.id;
+            del_name.textContent = b.dataset.name || ('#' + b.dataset.id);
         });
     </script>
 </body>

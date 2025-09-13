@@ -1,46 +1,44 @@
 <?php
 // /ecobici/administrador/dashboard.php
-session_start();
-if (!isset($_SESSION['user']) || (($_SESSION['user']['role'] ?? null) !== 'admin')) {
-    header('Location: /ecobici/login.php');
-    exit;
-}
+require_once __DIR__ . '/admin_boot.php'; // valida sesión admin y carga $pdo
 
-require_once __DIR__ . '/../config/db.php';
-if (!isset($pdo)) {
-    die('Error: $pdo no está definido. Revisa config/db.php');
-}
-
-// Helpers
+// ========== Helpers locales ==========
 if (!function_exists('e')) {
     function e($s)
     {
         return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     }
 }
-function scalar($pdo, $sql, $params = [], $default = 0)
+if (!function_exists('admin_flash')) {
+    function admin_flash($f)
+    {
+        if (!$f) return;
+        echo '<div class="alert alert-' . e($f['type']) . '">' . e($f['msg']) . '</div>';
+    }
+}
+function scalar(PDO $pdo, string $sql, array $params = [], $default = 0)
 {
     try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         $v = $st->fetchColumn();
         return $v !== false ? $v : $default;
-    } catch (Throwable $e) {
+    } catch (Throwable) {
         return $default;
     }
 }
-function rows($pdo, $sql, $params = [])
+function rows(PDO $pdo, string $sql, array $params = [])
 {
     try {
         $st = $pdo->prepare($sql);
         $st->execute($params);
         return $st->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
+    } catch (Throwable) {
         return [];
     }
 }
 
-/* ===== KPIs según tu BD ===== */
+// ========== KPIs ==========
 $usuariosTotal       = scalar($pdo, "SELECT COUNT(*) FROM users");
 $clientesTotal       = scalar($pdo, "SELECT COUNT(*) FROM users WHERE role='cliente'");
 $planesTotal         = scalar($pdo, "SELECT COUNT(*) FROM plans");
@@ -51,27 +49,24 @@ $pagosPendientesMes  = scalar($pdo, "SELECT COUNT(*) FROM payments WHERE estado=
 $ticketPromedioMes   = scalar($pdo, "SELECT IFNULL(AVG(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
 $nuevosUsuariosMes   = scalar($pdo, "SELECT COUNT(*) FROM users WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
 
-/* ===== Datos para gráficas ===== */
-// Pagos últimos 6 meses (completados)
+// ========== Datos para gráficas ==========
 $pagos6 = rows($pdo, "
-  SELECT DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH), '%Y-%m') ym,
+  SELECT DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH),'%Y-%m') ym,
          IFNULL((
-           SELECT SUM(monto) FROM payments
-           WHERE estado='completado'
-             AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH), '%Y-%m')
+            SELECT SUM(monto) FROM payments
+            WHERE estado='completado'
+              AND DATE_FORMAT(created_at,'%Y-%m') = DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH),'%Y-%m')
          ),0) total
   FROM (SELECT 0 seq UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5) m
   ORDER BY ym
 ");
-$labelsPagos = array_map(fn($r) => $r['ym'], $pagos6);
+$labelsPagos = array_column($pagos6, 'ym');
 $dataPagos   = array_map(fn($r) => round((float)$r['total'], 2), $pagos6);
 
-// Suscripciones por estado
 $subsEstados = rows($pdo, "SELECT estado, COUNT(*) qty FROM subscriptions GROUP BY estado");
-$labelsSubs  = array_map(fn($r) => $r['estado'], $subsEstados);
+$labelsSubs  = array_column($subsEstados, 'estado');
 $dataSubs    = array_map(fn($r) => (int)$r['qty'], $subsEstados);
 
-// Top planes por cantidad de suscripciones
 $topPlanes = rows($pdo, "
   SELECT p.nombre, COUNT(*) qty
   FROM subscriptions s
@@ -80,10 +75,10 @@ $topPlanes = rows($pdo, "
   ORDER BY qty DESC
   LIMIT 5
 ");
-$labelsTopPlanes = array_map(fn($r) => $r['nombre'], $topPlanes);
+$labelsTopPlanes = array_column($topPlanes, 'nombre');
 $dataTopPlanes   = array_map(fn($r) => (int)$r['qty'], $topPlanes);
 
-/* ===== Listados ===== */
+// ========== Listados ==========
 $ultimosPagos = rows($pdo, "
   SELECT p.id, p.monto, p.metodo, p.referencia, p.estado, p.created_at,
          u.name AS usuario, pl.nombre AS plan
@@ -93,7 +88,6 @@ $ultimosPagos = rows($pdo, "
   JOIN plans pl ON pl.id=s.plan_id
   ORDER BY p.created_at DESC LIMIT 8
 ");
-
 $ultimasSubs = rows($pdo, "
   SELECT s.id, u.name usuario, pl.nombre plan, s.estado, s.fecha_inicio, s.fecha_fin, s.created_at
   FROM subscriptions s
@@ -101,7 +95,6 @@ $ultimasSubs = rows($pdo, "
   JOIN plans pl ON pl.id=s.plan_id
   ORDER BY s.created_at DESC LIMIT 8
 ");
-
 $resumenPlanes = rows($pdo, "
   SELECT p.id, p.nombre, p.precio,
          COUNT(CASE WHEN s.estado='activa' THEN 1 END) activas
@@ -116,23 +109,15 @@ $resumenPlanes = rows($pdo, "
 
 <head>
     <meta charset="utf-8">
-    <title>EcoBici • Panel Administrador</title>
+    <title>EcoBici • Admin • Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- Bootstrap base + Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-
-    <!-- Tema verde/blanco + responsivo -->
     <style>
         :root {
             --ring: #e2e8f0;
             --muted: #64748b;
-            --green: #16a34a;
-            --green2: #22c55e;
-            --card: #fff;
             --bg: #f8fafc;
         }
 
@@ -140,111 +125,50 @@ $resumenPlanes = rows($pdo, "
             background: var(--bg);
         }
 
-        .navbar {
-            border-bottom: 1px solid var(--ring);
-        }
-
-        .navbar-brand {
-            font-weight: 700;
-            letter-spacing: .2px;
-        }
-
-        .nav-link {
-            color: #198754;
-        }
-
-        .nav-link:hover {
-            color: #0a6f3c;
-        }
-
-        .nav-link.active {
-            background: var(--green);
-            color: #fff !important;
-            border-radius: 999px;
-        }
-
         .card-elev {
-            background: var(--card);
+            background: #fff;
             border: 1px solid var(--ring);
             border-radius: 16px;
-            box-shadow: 0 10px 30px rgba(2, 6, 23, .06);
+            box-shadow: 0 10px 30px rgba(2, 6, 23, .06)
         }
 
         .muted {
-            color: var(--muted) !important;
+            color: var(--muted) !important
         }
 
         .stat {
             font-weight: 800;
             font-size: clamp(1.25rem, 2.1vw + .25rem, 2rem);
-            line-height: 1;
-        }
-
-        .btn-success {
-            background: var(--green);
-            border-color: var(--green);
-        }
-
-        .btn-success:hover {
-            background: var(--green2);
-            border-color: var(--green2);
+            line-height: 1
         }
 
         .chart-box {
             height: clamp(220px, 35vh, 340px);
         }
 
-        /* alto flexible */
         .table thead th {
-            white-space: nowrap;
+            white-space: nowrap
         }
 
         .table td {
-            vertical-align: middle;
+            vertical-align: middle
         }
 
-        /* Mejoras móviles */
         @media (max-width: 991.98px) {
-            .nav-link {
-                padding: .55rem 1rem;
-                margin: .25rem 0;
+            .btn-sm {
+                white-space: nowrap
             }
         }
     </style>
 </head>
 
 <body>
-
-    <!-- Navbar Bootstrap -->
-    <nav class="navbar navbar-expand-lg bg-white sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="/ecobici/administrador/dashboard.php">
-                <i class="bi bi-bicycle text-success"></i> EcoBici Admin
-            </a>
-
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="adminNav">
-                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
-                    <li class="nav-item"><a class="nav-link active px-3 py-2" href="/ecobici/administrador/dashboard.php"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/planes.php"><i class="bi bi-badge-ad me-1"></i>Planes</a></li>
-                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/usuarios.php"><i class="bi bi-people me-1"></i>Usuarios</a></li>
-                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/suscripciones.php"><i class="bi bi-diagram-3 me-1"></i>Suscripciones</a></li>
-                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/pagos.php"><i class="bi bi-cash-coin me-1"></i>Pagos</a></li>
-                </ul>
-                <div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">
-                    <a class="btn btn-outline-success" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>
-                    <a class="btn btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <?php admin_nav('dash'); ?>
 
     <main class="container py-4">
+        <?php admin_flash(flash()); ?>
 
-        <!-- KPIs: 1 col (xs), 2 (sm), 4 (xl) -->
+        <!-- KPIs -->
         <div class="row g-3">
             <?php
             $kpis = [
@@ -257,8 +181,7 @@ $resumenPlanes = rows($pdo, "
                 ['Pagos pend.', 'bi-hourglass-split', $pagosPendientesMes, 'Este mes'],
                 ['Usuarios (mes)', 'bi-calendar-plus', $nuevosUsuariosMes, 'Nuevos'],
             ];
-            foreach ($kpis as $k):
-            ?>
+            foreach ($kpis as $k): ?>
                 <div class="col-12 col-sm-6 col-xl-3">
                     <div class="card-elev p-3 h-100">
                         <div class="d-flex justify-content-between align-items-center">
@@ -266,8 +189,11 @@ $resumenPlanes = rows($pdo, "
                             <i class="bi <?= e($k[1]) ?> fs-4 text-success"></i>
                         </div>
                         <div class="stat mt-2">
-                            <?php if (is_numeric($k[2])): ?><span class="count" data-target="<?= (float)$k[2] ?>">0</span>
-                                <?php else: ?><?= $k[2] ?><?php endif; ?>
+                            <?php if (is_numeric($k[2])): ?>
+                                <span class="count" data-target="<?= (float)$k[2] ?>">0</span>
+                            <?php else: ?>
+                                <?= $k[2] ?>
+                            <?php endif; ?>
                         </div>
                         <small class="muted"><?= e($k[3]) ?></small>
                     </div>
@@ -398,7 +324,9 @@ $resumenPlanes = rows($pdo, "
                 <div class="card-elev p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Resumen de planes</h5>
-                        <a class="btn btn-sm btn-success" href="/ecobici/administrador/planes.php"><i class="bi bi-gear-wide-connected me-1"></i>Gestionar planes</a>
+                        <a class="btn btn-sm btn-success" href="/ecobici/administrador/planes.php">
+                            <i class="bi bi-gear-wide-connected me-1"></i>Gestionar planes
+                        </a>
                     </div>
                     <div class="table-responsive">
                         <table class="table align-middle">
@@ -426,14 +354,12 @@ $resumenPlanes = rows($pdo, "
             </div>
         </div>
 
-        <p class="mt-4 muted">EcoBici Puerto Barrios • Panel Bootstrap responsivo con detalles en verde.</p>
+        <p class="mt-4 muted">EcoBici Puerto Barrios • Dashboard Bootstrap responsivo.</p>
     </main>
 
-    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        // Contadores suaves
+        // Contadores
         function animateCount(el) {
             const t = parseFloat(el.dataset.target || el.textContent || '0');
             if (!isFinite(t)) return;
@@ -450,7 +376,7 @@ $resumenPlanes = rows($pdo, "
         }
         document.querySelectorAll('.count').forEach(animateCount);
 
-        // Gráficas responsive
+        // Charts
         const labelsPagos = <?= json_encode($labelsPagos) ?>;
         const dataPagos = <?= json_encode($dataPagos) ?>;
         const labelsSubs = <?= json_encode($labelsSubs ?: ['activa', 'pendiente', 'inactiva']) ?>;
