@@ -1,0 +1,43 @@
+/* cliente/styles/styles.css */
+
+/* Tipografía y colores base */
+:root{
+  --eco-primary: #1aa34a;   /* verde EcoBici */
+  --eco-dark: #0d1b1e;
+}
+body{
+  color:#222;
+}
+
+/* Navbar */
+.navbar-brand{ letter-spacing:.3px; }
+.nav-link.active{ font-weight:600; }
+
+/* Hero */
+header#inicio{ 
+  background: linear-gradient(180deg,#f8fafc 0%, #ffffff 100%);
+}
+header#inicio .display-5{ letter-spacing:.4px; }
+
+/* Botones (respetando Bootstrap, pero con nuestro color) */
+.btn-primary{
+  background-color: var(--eco-primary);
+  border-color: var(--eco-primary);
+}
+.btn-primary:hover{
+  filter: brightness(.95);
+}
+
+/* Tarjetas de planes */
+.card{
+  border-radius: 1rem;
+}
+.card .card-title{
+  font-weight:700;
+}
+.card .fs-5{
+  font-weight:700;
+}
+
+/* Footer */
+footer{ background:#fff; }
