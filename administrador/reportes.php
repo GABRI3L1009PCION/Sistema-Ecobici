@@ -275,7 +275,7 @@ body{ background:#f7fff9; }
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h3 m-0">Reportes EcoBici</h1>
     <div>
-      <a href="/ecobici/administrador/index.php" class="btn btn-outline-success">Volver</a>
+      <a href="/ecobici/administrador/dashboard.php" class="btn btn-outline-success">Volver</a>
     </div>
   </div>
   <div class="line-title mb-3"></div>
