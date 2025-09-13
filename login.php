@@ -3,269 +3,149 @@
 session_start();
 require_once __DIR__ . '/config/db.php';
 
-$logoPath = '/ecobici/cliente/styles/logo.png';
-
-$justLoggedIn = false;
-$redirectTo   = '/ecobici/index.php';
-
+$errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    $pass  = $_POST['password'] ?? '';
+  $email    = trim($_POST['email'] ?? '');
+  $password = $_POST['password'] ?? '';
 
-    $st = $pdo->prepare("SELECT id,name,email,password,role FROM users WHERE email=? LIMIT 1");
-    $st->execute([$email]);
-    $u = $st->fetch(PDO::FETCH_ASSOC);
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $errors[] = 'Ingresa un correo válido.';
+  }
+  if ($password === '') {
+    $errors[] = 'Ingresa tu contraseña.';
+  }
 
-    if ($u && password_verify($pass, $u['password'])) {
-        session_regenerate_id(true);
-        $_SESSION['user'] = [
-            'id' => $u['id'],
-            'name' => $u['name'],
-            'email' => $u['email'],
-            'role' => $u['role']
-        ];
-        $redirectTo = ($u['role'] === 'admin')
-            ? '/ecobici/administrador/dashboard.php'
-            : '/ecobici/index.php';
-        $justLoggedIn = true;
-    } else {
-        $error = "Correo o contraseña incorrectos.";
+  if (empty($errors)) {
+    try {
+      $stmt = $pdo->prepare("SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1");
+      $stmt->execute([$email]);
+      $user = $stmt->fetch();
+
+      if ($user && password_verify($password, $user['password'])) {
+        // Autenticado
+        $_SESSION['user_id']   = (int)$user['id'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_role'] = $user['role'] ?: 'cliente';
+
+        // Redirige al dashboard (ajusta si tu ruta es otra)
+        header('Location: dashboard.php');
+        exit;
+      } else {
+        $errors[] = 'Credenciales inválidas. Verifica tu correo y contraseña.';
+      }
+    } catch (Throwable $e) {
+      $errors[] = 'Error de autenticación. Intenta de nuevo.';
     }
-}
-
-if (!$justLoggedIn && isset($_SESSION['user'])) {
-    $to = (($_SESSION['user']['role'] ?? '') === 'admin')
-        ? '/ecobici/administrador/dashboard.php'
-        : '/ecobici/index.php';
-    header("Location: {$to}");
-    exit;
+  }
 }
 ?>
 <!doctype html>
 <html lang="es">
-
 <head>
-    <meta charset="utf-8">
-    <title>EcoBici • Iniciar sesión</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        :root {
-            --green: #16a34a;
-            --green-2: #22c55e;
-            --ring: #e5e7eb;
-            --bg: #f8fafc;
-            --shadow: 0 24px 60px rgba(2, 6, 23, .08);
-            --addonW: 46px;
-        }
+  <meta charset="utf-8">
+  <title>Iniciar sesión | EcoBici Puerto Barrios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        body {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg);
-            padding: 24px;
-        }
+  <!-- Bootstrap + Iconos -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
-        .card-login {
-            width: min(520px, 94vw);
-            border: 1px solid var(--ring);
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-            overflow: hidden
-        }
-
-        .card-top {
-            padding: 16px 18px;
-            border-bottom: 1px solid var(--ring);
-            background: linear-gradient(135deg, rgba(34, 197, 94, .13), rgba(34, 197, 94, .06))
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: .6rem;
-            font-weight: 800
-        }
-
-        .brand img {
-            height: 28px;
-            width: auto;
-            object-fit: contain
-        }
-
-        .btn-success {
-            background: var(--green);
-            border-color: var(--green)
-        }
-
-        .btn-success:hover {
-            background: var(--green-2);
-            border-color: var(--green-2)
-        }
-
-        .btn-ghost {
-            border: 1px solid var(--ring);
-            background: #fff
-        }
-
-        .btn-ghost:hover {
-            border-color: #d1d5db
-        }
-
-        .helper {
-            color: #64748b;
-            font-size: .86rem
-        }
-
-        /* === Emparejar campos === */
-        .input-group.equal {
-            align-items: stretch;
-        }
-
-        .input-group.equal .form-control,
-        .input-group.equal .input-group-text {
-            height: 48px
-        }
-
-        .input-group.equal .input-group-text {
-            width: var(--addonW);
-            min-width: var(--addonW);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0;
-        }
-
-        /* Mantener bordes de Bootstrap tal cual para que los radios se alineen */
-
-        /* El add-on del correo permanece visible; ocultamos SOLO el ícono */
-        .addon-ghost i {
-            opacity: 0;
-        }
-
-        /* foco */
-        .form-control:focus {
-            box-shadow: 0 0 0 .25rem rgba(34, 197, 94, .15);
-            border-color: var(--green)
-        }
-    </style>
+  <!-- Reutilizamos los estilos del register para consistencia -->
+  <link rel="stylesheet" href="cliente/styles/register.css">
 </head>
-
 <body>
 
-    <div class="card card-login">
-        <div class="card-top">
-            <div class="brand">
-                <img src="<?= htmlspecialchars($logoPath) ?>" alt="EcoBici" onerror="this.style.display='none'">
-                <span>EcoBici</span>
+<div class="container min-vh-100 d-flex align-items-center py-3">
+  <div class="row justify-content-center w-100">
+    <div class="col-12 col-md-10 col-lg-9 col-xl-8">
+      
+      <div class="card shadow-sm border-0 rounded-4 overflow-hidden register-card">
+        <div class="px-4 py-2 bg-success-subtle border-bottom small fw-semibold">EcoBici</div>
+
+        <div class="card-body p-4 p-md-4">
+          <h1 class="h4 text-center fw-bold mb-1">Iniciar sesión</h1>
+          <p class="text-center text-muted mb-3">Bienvenido de vuelta a EcoBici Puerto Barrios.</p>
+
+          <?php if (!empty($errors)): ?>
+            <div id="formErrors" class="alert alert-danger alert-dismissible fade show py-2" role="alert">
+              <strong class="small d-block mb-1">Ups…</strong>
+              <ul class="mb-0 small">
+                <?php foreach ($errors as $e): ?>
+                  <li><?= htmlspecialchars($e) ?></li>
+                <?php endforeach; ?>
+              </ul>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
             </div>
-        </div>
+          <?php endif; ?>
 
-        <div class="card-body p-4">
-            <h1 class="h4 text-center mb-1">Iniciar sesión</h1>
-            <p class="helper text-center mb-4">Accede con tus credenciales.</p>
-
-            <?php if (!empty($error)): ?>
-                <div class="alert alert-danger py-2">
-                    <i class="bi bi-exclamation-triangle me-1"></i><?= htmlspecialchars($error) ?>
-                </div>
-            <?php endif; ?>
-
-            <form method="post" autocomplete="off" class="vstack gap-3">
-                <!-- Correo -->
-                <div>
-                    <label class="form-label">Correo</label>
-                    <div class="input-group equal">
-                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                        <input type="email" name="email" class="form-control"
-                            placeholder="Por favor ingrese su correo" required>
-                        <!-- add-on “gemelo” con mismo ancho; solo se oculta el ícono -->
-                        <span class="input-group-text addon-ghost" aria-hidden="true">
-                            <i class="bi bi-eye-slash"></i>
-                        </span>
-                    </div>
-                    <div class="form-text helper">Usa el correo con el que te registraste.</div>
-                </div>
-
-                <!-- Contraseña -->
-                <div>
-                    <label class="form-label">Contraseña</label>
-                    <div class="input-group equal">
-                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                        <input type="password" name="password" id="password" class="form-control"
-                            placeholder="Por favor ingrese su contraseña" required>
-                        <button type="button" class="input-group-text" id="togglePass" title="Ver/ocultar">
-                            <i class="bi bi-eye-slash" id="eyeIcon"></i>
-                        </button>
-                    </div>
-                    <div class="form-text helper">No compartas tu contraseña.</div>
-                </div>
-
-                <!-- Acciones -->
-                <div class="d-flex gap-2">
-                    <a href="/ecobici/index.php" class="btn btn-ghost flex-fill">
-                        <i class="bi bi-arrow-left me-1"></i> Regresar
-                    </a>
-                    <button class="btn btn-success flex-fill">
-                        <i class="bi bi-box-arrow-in-right me-1"></i> Entrar
-                    </button>
-                </div>
-            </form>
-
-            <div class="text-center mt-3">
-                <small class="text-muted">¿No tienes cuenta? <a href="/ecobici/index.php#planes">Regístrate</a></small>
+          <form method="post" novalidate>
+            <!-- Correo -->
+            <div class="mb-3">
+              <label class="form-label mb-1" for="email">Correo</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fa fa-envelope"></i></span>
+                <input id="email" type="email" name="email" class="form-control" placeholder="ejemplo@correo.com" required>
+              </div>
             </div>
+
+            <!-- Contraseña -->
+            <div class="mb-3">
+              <label class="form-label mb-1" for="password">Contraseña</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="fa fa-lock"></i></span>
+                <input id="password" type="password" name="password" class="form-control" placeholder="Tu contraseña" required>
+                <button class="btn btn-outline-secondary" type="button" id="togglePass"><i class="fa fa-eye-slash"></i></button>
+              </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="d-flex gap-3 justify-content-center mt-2">
+              <a href="index.php"
+                 class="btn btn-outline-secondary btn-smh d-inline-flex align-items-center gap-2"
+                 onclick="if (history.length > 1) { event.preventDefault(); history.back(); }">
+                <i class="fa fa-arrow-left"></i>
+                Regresar
+              </a>
+              <button type="submit" class="btn btn-success btn-smh">
+                <i class="fa fa-right-to-bracket me-2"></i> Iniciar sesión
+              </button>
+            </div>
+
+            <div class="text-center mt-2">
+              <small class="text-muted">¿No tienes cuenta?
+                <a href="register.php" class="text-decoration-none">Crear cuenta</a>
+              </small>
+            </div>
+          </form>
         </div>
+      </div>
+
     </div>
+  </div>
+</div>
 
-    <!-- Modal Acceso concedido -->
-    <div class="modal fade" id="loginOkModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content border-0">
-                <div class="modal-body text-center p-4">
-                    <div class="display-6 text-success mb-2"><i class="bi bi-shield-check"></i></div>
-                    <h5 class="mb-1">Acceso concedido</h5>
-                    <p class="helper mb-0">Redirigiendo…</p>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Toggle mostrar/ocultar contraseña (igual que en register)
+const btn = document.getElementById('togglePass');
+const inp = document.getElementById('password');
+btn?.addEventListener('click', () => {
+  const isText = inp.type === 'text';
+  inp.type = isText ? 'password' : 'text';
+  const icon = btn.querySelector('i');
+  if (icon) icon.className = isText ? 'fa fa-eye-slash' : 'fa fa-eye';
+});
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Toggle ver/ocultar contraseña
-        (function() {
-            const pass = document.getElementById('password');
-            const btn = document.getElementById('togglePass');
-            const eye = document.getElementById('eyeIcon');
-            if (btn && pass && eye) {
-                btn.addEventListener('click', () => {
-                    const show = pass.type === 'password';
-                    pass.type = show ? 'text' : 'password';
-                    eye.classList.toggle('bi-eye', show);
-                    eye.classList.toggle('bi-eye-slash', !show);
-                });
-            }
-        })();
-
-        // Modal Acceso concedido y redirección
-        (function() {
-            const loginOk = <?= $justLoggedIn ? 'true' : 'false' ?>;
-            if (!loginOk) return;
-            const modalEl = document.getElementById('loginOkModal');
-            const modal = new bootstrap.Modal(modalEl, {
-                backdrop: 'static',
-                keyboard: false
-            });
-            modal.show();
-            setTimeout(() => {
-                window.location.href = <?= json_encode($redirectTo) ?>;
-            }, 1400);
-        })();
-    </script>
+// Auto fade-out de alertas tras 6s (consistencia con register)
+const err = document.getElementById('formErrors');
+if (err) {
+  setTimeout(() => {
+    err.classList.remove('show');
+    setTimeout(() => err.remove(), 600);
+  }, 6000);
+}
+</script>
 </body>
 
 </html>

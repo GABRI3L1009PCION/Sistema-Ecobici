@@ -1,101 +1,143 @@
 /* ===========================
-   EcoBici Puerto Barrios
-   Estilos para register.php
+   EcoBici • Register (look & feel tipo login)
    =========================== */
 
-:root {
+:root{
   --eco-green:#16a34a;
   --eco-green-dark:#15803d;
-  --eco-soft:#e9f6ec;
   --eco-ink:#0b1b13;
+  --eco-soft:#e9f6ec;
   --eco-white:#ffffff;
 }
 
-/* Fondo con degradado */
-body {
-  min-height:100vh;
-  background:
-    radial-gradient(1400px 700px at 80% -10%, rgba(22,163,74,.12), transparent 60%),
-    linear-gradient(180deg, #f3fbf6 0%, #ffffff 55%, #f2fcf7 100%);
-  font-family:"Segoe UI", Roboto, sans-serif;
-  color:var(--eco-ink);
-  display:flex;
-  flex-direction:column;
+/* Fondo con degradado verde más notorio */
+html, body {
+  min-height: 100%;
+  font-family: "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  color: var(--eco-ink);
+  background: linear-gradient(135deg, #e9f6ec 0%, #ffffff 50%, #d6f2df 100%);
 }
 
-/* Navbar */
-.eco-navbar {
-  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.92));
-  transition: box-shadow .25s, background .25s;
+
+/* ---------- Card tipo login ---------- */
+.card{
+  border-radius: 1rem;
+  border: 1px solid var(--eco-soft);
+  box-shadow: 0 18px 40px rgba(0,0,0,.08);
+  background: #fff;
+  max-width: 720px;     /* ancho cómodo como el login */
+  margin: 0 auto;
 }
-.eco-navbar.scrolled {
-  box-shadow:0 4px 18px rgba(0,0,0,.08);
-  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.90));
+.card:hover{ box-shadow: 0 22px 48px rgba(0,0,0,.11); }
+.bg-success-subtle{ background: #eaf7ee !important; }
+
+/* ---------- Títulos ---------- */
+h1.h3, .h3{
+  font-weight: 700;
 }
 
-/* Main */
-main {
-  flex:1;
-  display:flex;
-  align-items:center;
-  padding:2rem 1rem;
+/* ---------- Inputs apilados con íconos ---------- */
+.input-group-text{
+  width: 48px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f4fbf6;
+  border-color: var(--eco-soft);
+  color: var(--eco-green-dark);
+}
+.form-control{
+  height: 48px;                 /* misma altura que login */
+  border-radius: .55rem;
+  border-color: var(--eco-soft);
+  transition: border-color .2s, box-shadow .2s, background-color .2s;
+}
+.form-control:focus{
+  border-color: var(--eco-green);
+  box-shadow: 0 0 0 .18rem rgba(22,163,74,.22);
+  background-color: #fff;
+}
+.form-control::placeholder{ color:#97a3a6; }
+
+/* Botón de mostrar/ocultar contraseña dentro del input-group */
+.input-group .btn{
+  height: 48px;
+  border-color: var(--eco-soft);
+}
+.input-group .btn:hover{
+  background:#eef2f4;
 }
 
-/* Formulario */
-form {
-  background:#fff;
-  border:1px solid var(--eco-soft);
-  border-radius:1rem;
-  box-shadow:0 12px 28px rgba(0,0,0,.08);
-  transition: box-shadow .25s, transform .25s;
+/* ---------- Botones de acción (alineados a la derecha) ---------- */
+.btn{
+  height: 44px;
+  border-radius: .5rem;
+  font-weight: 600;
 }
-form:hover {
-  box-shadow:0 20px 44px rgba(0,0,0,.12);
-  transform:translateY(-2px);
+.btn-success{
+  background: var(--eco-green);
+  border-color: var(--eco-green);
+  transition: background .2s, transform .2s, box-shadow .2s;
 }
-form .form-label {
-  font-weight:500;
-  color:var(--eco-ink);
+.btn-success:hover{
+  background: var(--eco-green-dark);
+  border-color: var(--eco-green-dark);
+  transform: translateY(-1px);
 }
-form .form-control {
-  border-radius:.5rem;
-  border-color:var(--eco-soft);
-  transition:border-color .25s, box-shadow .25s;
+.btn-outline-secondary{
+  border-color:#d8dee2;
 }
-form .form-control:focus {
-  border-color:var(--eco-green);
-  box-shadow:0 0 0 .2rem rgba(22,163,74,.25);
+.btn-outline-secondary:hover{
+  background:#eef2f4;
 }
-
-/* Botones */
-.btn-primary {
-  background:var(--eco-green);
-  border-color:var(--eco-green);
-  transition:background .2s, transform .2s;
+.btn-outline-success{
+  color: var(--eco-green);
+  border-color: var(--eco-green);
 }
-.btn-primary:hover {
-  background:var(--eco-green-dark);
-  border-color:var(--eco-green-dark);
-  transform:translateY(-2px);
-}
-.btn-outline-primary {
-  color:var(--eco-green);
-  border-color:var(--eco-green);
-  transition:background .2s, transform .2s;
-}
-.btn-outline-primary:hover {
-  background:var(--eco-green);
+.btn-outline-success:hover{
+  background: var(--eco-green);
   color:#fff;
-  transform:translateY(-2px);
 }
 
-/* Alertas */
-.alert {
-  border-radius:.75rem;
+/* ---------- Alertas ---------- */
+.alert{
+  border-radius: .75rem;
+  padding: .9rem 1rem;
 }
 
-/* Footer */
-footer {
-  background:var(--eco-white);
-  border-top:1px solid var(--eco-soft);
+/* ---------- Layout responsivo ---------- */
+.container.min-vh-100{
+  /* asegura centrado vertical sin forzar scroll */
+  min-height: calc(100vh - 0px);
+}
+@media (max-width: 576px){
+  .card{ max-width: 92vw; }
+  .form-control, .input-group .btn{ height: 46px; }
+  .btn{ height: 42px; }
+}
+
+/* Botón Regresar: colores y animación como en login */
+.btn-smh { transition: background .2s, color .2s, border-color .2s, transform .2s, box-shadow .2s; }
+
+.btn-outline-secondary {
+  color: #1f2937;                 /* gris oscuro legible */
+  border-color: #d1d5db;          /* borde gris suave */
+  background: transparent;
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus {
+  background: #eef2f4;            /* NO blanco al pasar el mouse */
+  color: #0b1b13;
+  border-color: #c5ccd1;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,.06);
+}
+
+/* Botón Crear cuenta: misma micro-animación */
+.btn-success {
+  transition: background .2s, transform .2s, box-shadow .2s;
+}
+.btn-success:hover,
+.btn-success:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(22,163,74,.20);
 }
