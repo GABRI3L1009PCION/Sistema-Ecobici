@@ -1,5 +1,5 @@
 <?php
-// /ecobici/register.php
+session_start();
 require_once __DIR__ . '/config/db.php';
 
 /* --- Migración ligera: agrega columnas si no existen (MySQL 8+) --- */
@@ -158,7 +158,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ok = true;
       }
 
-      if ($ok) $success = true;
+            if ($ok) {
+        // ID del nuevo usuario
+        $newUserId = (int)$pdo->lastInsertId();
+
+        // Auto-login (igual que login.php / dashboard)
+        session_regenerate_id(true);
+        $_SESSION['user_id']   = $newUserId;
+        $_SESSION['user_name'] = $name;
+        $_SESSION['user_role'] = 'cliente';
+        $_SESSION['user'] = [
+          'id'    => $newUserId,
+          'name'  => $name,
+          'email' => $email,
+          'role'  => 'cliente',
+        ];
+
+        // Redirigir a membresía/pago con plan si hay
+        $BASE = '/ecobici'; // ajusta si tu proyecto vive en otra carpeta
+        $plan = $_SESSION['preselected_plan'] ?? null;
+        $q    = $plan ? "?checkout=1&plan={$plan}" : "?checkout=1";
+        header("Location: {$BASE}/cliente/membresia.php{$q}");
+        exit;
+      }
+
 
     } catch (Throwable $e) {
       $errors[] = 'No se pudo crear la cuenta. Intenta más tarde.';
