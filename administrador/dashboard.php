@@ -1,17 +1,23 @@
 <?php
-// administrador/dashboard.php
+// /ecobici/administrador/dashboard.php
 session_start();
 if (!isset($_SESSION['user']) || (($_SESSION['user']['role'] ?? null) !== 'admin')) {
     header('Location: /ecobici/login.php');
     exit;
 }
 
-require_once __DIR__ . '/../config/db.php'; // Debe exponer $pdo
+require_once __DIR__ . '/../config/db.php';
 if (!isset($pdo)) {
     die('Error: $pdo no está definido. Revisa config/db.php');
 }
 
 // Helpers
+if (!function_exists('e')) {
+    function e($s)
+    {
+        return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    }
+}
 function scalar($pdo, $sql, $params = [], $default = 0)
 {
     try {
@@ -34,7 +40,7 @@ function rows($pdo, $sql, $params = [])
     }
 }
 
-/* ===================== KPIs (tu BD) ===================== */
+/* ===== KPIs según tu BD ===== */
 $usuariosTotal       = scalar($pdo, "SELECT COUNT(*) FROM users");
 $clientesTotal       = scalar($pdo, "SELECT COUNT(*) FROM users WHERE role='cliente'");
 $planesTotal         = scalar($pdo, "SELECT COUNT(*) FROM plans");
@@ -45,8 +51,8 @@ $pagosPendientesMes  = scalar($pdo, "SELECT COUNT(*) FROM payments WHERE estado=
 $ticketPromedioMes   = scalar($pdo, "SELECT IFNULL(AVG(monto),0) FROM payments WHERE estado='completado' AND YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
 $nuevosUsuariosMes   = scalar($pdo, "SELECT COUNT(*) FROM users WHERE YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE())");
 
-/* ===================== Charts ===================== */
-// Pagos completados últimos 6 meses
+/* ===== Datos para gráficas ===== */
+// Pagos últimos 6 meses (completados)
 $pagos6 = rows($pdo, "
   SELECT DATE_FORMAT(DATE_SUB(LAST_DAY(CURDATE()), INTERVAL seq MONTH), '%Y-%m') ym,
          IFNULL((
@@ -65,7 +71,7 @@ $subsEstados = rows($pdo, "SELECT estado, COUNT(*) qty FROM subscriptions GROUP 
 $labelsSubs  = array_map(fn($r) => $r['estado'], $subsEstados);
 $dataSubs    = array_map(fn($r) => (int)$r['qty'], $subsEstados);
 
-// Top planes por suscripciones
+// Top planes por cantidad de suscripciones
 $topPlanes = rows($pdo, "
   SELECT p.nombre, COUNT(*) qty
   FROM subscriptions s
@@ -77,7 +83,7 @@ $topPlanes = rows($pdo, "
 $labelsTopPlanes = array_map(fn($r) => $r['nombre'], $topPlanes);
 $dataTopPlanes   = array_map(fn($r) => (int)$r['qty'], $topPlanes);
 
-/* ===================== Listados ===================== */
+/* ===== Listados ===== */
 $ultimosPagos = rows($pdo, "
   SELECT p.id, p.monto, p.metodo, p.referencia, p.estado, p.created_at,
          u.name AS usuario, pl.nombre AS plan
@@ -98,11 +104,11 @@ $ultimasSubs = rows($pdo, "
 
 $resumenPlanes = rows($pdo, "
   SELECT p.id, p.nombre, p.precio,
-         COUNT(CASE WHEN s.estado='activa' THEN 1 END) AS activas
+         COUNT(CASE WHEN s.estado='activa' THEN 1 END) activas
   FROM plans p
   LEFT JOIN subscriptions s ON s.plan_id=p.id
   GROUP BY p.id, p.nombre, p.precio
-  ORDER BY p.id ASC
+  ORDER BY p.id
 ");
 ?>
 <!doctype html>
@@ -112,153 +118,133 @@ $resumenPlanes = rows($pdo, "
     <meta charset="utf-8">
     <title>EcoBici • Panel Administrador</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- Bootstrap & Icons -->
+
+    <!-- Bootstrap base + Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <!-- Tema verde/blanco + responsivo -->
     <style>
         :root {
-            --bg: #f8fafc;
-            --card: #fff;
-            --text: #0f172a;
+            --ring: #e2e8f0;
             --muted: #64748b;
             --green: #16a34a;
-            --green-2: #22c55e;
-            --ring: #e2e8f0;
-            --shadow: 0 10px 30px rgba(2, 6, 23, .06);
+            --green2: #22c55e;
+            --card: #fff;
+            --bg: #f8fafc;
         }
 
         body {
             background: var(--bg);
-            color: var(--text)
         }
 
         .navbar {
-            background: #fff;
-            border-bottom: 1px solid var(--ring)
+            border-bottom: 1px solid var(--ring);
         }
 
-        .navbar .navbar-brand {
+        .navbar-brand {
             font-weight: 700;
-            letter-spacing: .2px
+            letter-spacing: .2px;
+        }
+
+        .nav-link {
+            color: #198754;
+        }
+
+        .nav-link:hover {
+            color: #0a6f3c;
+        }
+
+        .nav-link.active {
+            background: var(--green);
+            color: #fff !important;
+            border-radius: 999px;
+        }
+
+        .card-elev {
+            background: var(--card);
+            border: 1px solid var(--ring);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(2, 6, 23, .06);
+        }
+
+        .muted {
+            color: var(--muted) !important;
+        }
+
+        .stat {
+            font-weight: 800;
+            font-size: clamp(1.25rem, 2.1vw + .25rem, 2rem);
+            line-height: 1;
         }
 
         .btn-success {
             background: var(--green);
-            border-color: var(--green)
+            border-color: var(--green);
         }
 
         .btn-success:hover {
-            background: var(--green-2);
-            border-color: var(--green-2)
+            background: var(--green2);
+            border-color: var(--green2);
         }
 
-        .btn-glass {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            color: #166534;
-            transition: transform .2s
+        .chart-box {
+            height: clamp(220px, 35vh, 340px);
         }
 
-        .btn-glass:hover {
-            transform: translateY(-1px)
+        /* alto flexible */
+        .table thead th {
+            white-space: nowrap;
         }
 
-        .chip {
-            background: #ecfdf5;
-            border: 1px solid #bbf7d0;
-            color: #065f46;
-            padding: .25rem .6rem;
-            border-radius: 999px;
-            font-size: .78rem
+        .table td {
+            vertical-align: middle;
         }
 
-        .card-elev {
-            background: #fff;
-            border: 1px solid var(--ring);
-            border-radius: 16px;
-            box-shadow: var(--shadow)
-        }
-
-        .tbl thead th {
-            background: #f8fafc;
-            border-bottom-color: var(--ring) !important
-        }
-
-        .tbl tbody td {
-            border-top-color: #eef2f7 !important
-        }
-
-        .kpi {
-            position: relative;
-            overflow: hidden;
-            border-radius: 16px
-        }
-
-        .kpi::after {
-            content: "";
-            position: absolute;
-            inset: -2px;
-            border-radius: 16px;
-            padding: 1.2px;
-            background: conic-gradient(from 180deg, rgba(34, 197, 94, .25), rgba(187, 247, 208, .25), rgba(34, 197, 94, .25));
-            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-            mask-composite: exclude;
-            -webkit-mask-composite: xor;
-            animation: spin 6s linear infinite
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg)
+        /* Mejoras móviles */
+        @media (max-width: 991.98px) {
+            .nav-link {
+                padding: .55rem 1rem;
+                margin: .25rem 0;
             }
-        }
-
-        .stat {
-            font-size: 1.9rem;
-            font-weight: 800;
-            line-height: 1
-        }
-
-        .muted {
-            color: var(--muted) !important
-        }
-
-        .reveal {
-            opacity: 0;
-            transform: translateY(10px);
-            transition: opacity .5s, transform .5s
-        }
-
-        .reveal.show {
-            opacity: 1;
-            transform: translateY(0)
-        }
-
-        .badge-soft {
-            background: #f0fdf4;
-            color: #166534;
-            border: 1px solid #bbf7d0
         }
     </style>
 </head>
 
 <body>
-    <nav class="navbar navbar-expand">
+
+    <!-- Navbar Bootstrap -->
+    <nav class="navbar navbar-expand-lg bg-white sticky-top">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#"><i class="bi bi-bicycle me-2 text-success"></i>EcoBici Admin</a>
-            <div class="ms-auto d-flex gap-2">
-                <span class="chip"><i class="bi bi-shield-lock me-1"></i>Administrador</span>
-                <a class="btn btn-sm btn-glass" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>
-                <a class="btn btn-sm btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>
+            <a class="navbar-brand d-flex align-items-center gap-2" href="/ecobici/administrador/dashboard.php">
+                <i class="bi bi-bicycle text-success"></i> EcoBici Admin
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="adminNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+                    <li class="nav-item"><a class="nav-link active px-3 py-2" href="/ecobici/administrador/dashboard.php"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/planes.php"><i class="bi bi-badge-ad me-1"></i>Planes</a></li>
+                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/usuarios.php"><i class="bi bi-people me-1"></i>Usuarios</a></li>
+                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/suscripciones.php"><i class="bi bi-diagram-3 me-1"></i>Suscripciones</a></li>
+                    <li class="nav-item"><a class="nav-link px-3 py-2" href="/ecobici/administrador/pagos.php"><i class="bi bi-cash-coin me-1"></i>Pagos</a></li>
+                </ul>
+                <div class="d-flex gap-2 ms-lg-3 mt-3 mt-lg-0">
+                    <a class="btn btn-outline-success" href="/ecobici/index.php"><i class="bi bi-house-door me-1"></i>Pública</a>
+                    <a class="btn btn-outline-danger" href="/ecobici/logout.php"><i class="bi bi-box-arrow-right me-1"></i>Salir</a>
+                </div>
             </div>
         </div>
     </nav>
 
     <main class="container py-4">
-        <!-- KPIs -->
+
+        <!-- KPIs: 1 col (xs), 2 (sm), 4 (xl) -->
         <div class="row g-3">
             <?php
             $kpis = [
@@ -271,76 +257,73 @@ $resumenPlanes = rows($pdo, "
                 ['Pagos pend.', 'bi-hourglass-split', $pagosPendientesMes, 'Este mes'],
                 ['Usuarios (mes)', 'bi-calendar-plus', $nuevosUsuariosMes, 'Nuevos'],
             ];
-            foreach ($kpis as $k) {
+            foreach ($kpis as $k):
             ?>
-                <div class="col-6 col-lg-3">
-                    <div class="card-elev kpi p-3 reveal">
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="card-elev p-3 h-100">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="muted"><?= htmlspecialchars($k[0]) ?></span>
-                            <i class="bi <?= $k[1] ?> fs-4 text-success"></i>
+                            <span class="muted"><?= e($k[0]) ?></span>
+                            <i class="bi <?= e($k[1]) ?> fs-4 text-success"></i>
                         </div>
                         <div class="stat mt-2">
-                            <?php if (is_numeric($k[2])): ?>
-                                <span class="count" data-target="<?= (float)$k[2] ?>">0</span>
-                            <?php else: ?>
-                                <?= $k[2] ?>
-                            <?php endif; ?>
+                            <?php if (is_numeric($k[2])): ?><span class="count" data-target="<?= (float)$k[2] ?>">0</span>
+                                <?php else: ?><?= $k[2] ?><?php endif; ?>
                         </div>
-                        <small class="muted"><?= htmlspecialchars($k[3]) ?></small>
+                        <small class="muted"><?= e($k[3]) ?></small>
                     </div>
                 </div>
-            <?php } ?>
+            <?php endforeach; ?>
         </div>
 
-        <!-- Charts -->
+        <!-- Gráficas -->
         <div class="row g-3 mt-1">
-            <div class="col-lg-6">
-                <div class="card-elev p-3 reveal">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="col-12 col-lg-6">
+                <div class="card-elev p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <h5 class="mb-0">Pagos completados (últimos 6 meses)</h5>
-                        <span class="badge rounded-pill text-bg-success">Q</span>
+                        <a class="btn btn-sm btn-outline-success" href="/ecobici/administrador/pagos.php">Ir a pagos</a>
                     </div>
-                    <canvas id="chartPagos" height="120"></canvas>
+                    <div class="chart-box"><canvas id="chartPagos"></canvas></div>
                 </div>
             </div>
-            <div class="col-lg-3">
-                <div class="card-elev p-3 reveal">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card-elev p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <h5 class="mb-0">Suscripciones por estado</h5>
-                        <span class="badge rounded-pill text-bg-success"><i class="bi bi-diagram-3"></i></span>
+                        <a class="btn btn-sm btn-outline-success" href="/ecobici/administrador/suscripciones.php">Ver</a>
                     </div>
-                    <canvas id="chartSubs" height="120"></canvas>
+                    <div class="chart-box"><canvas id="chartSubs"></canvas></div>
                 </div>
             </div>
-            <div class="col-lg-3">
-                <div class="card-elev p-3 reveal">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card-elev p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                         <h5 class="mb-0">Top planes</h5>
-                        <span class="badge rounded-pill text-bg-success"><i class="bi bi-trophy"></i></span>
+                        <a class="btn btn-sm btn-outline-success" href="/ecobici/administrador/planes.php">Ver</a>
                     </div>
-                    <canvas id="chartPlanes" height="120"></canvas>
+                    <div class="chart-box"><canvas id="chartPlanes"></canvas></div>
                 </div>
             </div>
         </div>
 
-        <!-- Tablas -->
+        <!-- Listados -->
         <div class="row g-3 mt-1">
-            <div class="col-lg-7">
-                <div class="card-elev p-3 reveal">
+            <div class="col-12 col-lg-7">
+                <div class="card-elev p-3 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Últimos pagos</h5>
-                        <a class="btn btn-sm btn-outline-success" href="/ecobici/pagos/index.php">Ver todos</a>
+                        <a class="btn btn-sm btn-outline-success" href="/ecobici/administrador/pagos.php">Ver todos</a>
                     </div>
                     <div class="table-responsive">
-                        <table class="table tbl align-middle">
+                        <table class="table align-middle">
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Usuario</th>
-                                    <th>Plan</th>
+                                    <th class="d-none d-sm-table-cell">Plan</th>
                                     <th>Monto</th>
-                                    <th>Estado</th>
-                                    <th>Fecha</th>
+                                    <th class="d-none d-md-table-cell">Estado</th>
+                                    <th class="d-none d-lg-table-cell">Fecha</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -350,16 +333,16 @@ $resumenPlanes = rows($pdo, "
                                     </tr>
                                     <?php else: foreach ($ultimosPagos as $p): ?>
                                         <tr>
-                                            <td>#<?= htmlspecialchars($p['id']) ?></td>
-                                            <td><?= htmlspecialchars($p['usuario']) ?></td>
-                                            <td><?= htmlspecialchars($p['plan']) ?></td>
-                                            <td><span class="fw-semibold text-success">Q <?= number_format((float)$p['monto'], 2) ?></span></td>
-                                            <td>
+                                            <td>#<?= e($p['id']) ?></td>
+                                            <td><?= e($p['usuario']) ?></td>
+                                            <td class="d-none d-sm-table-cell"><?= e($p['plan']) ?></td>
+                                            <td class="fw-semibold text-success">Q <?= number_format((float)$p['monto'], 2) ?></td>
+                                            <td class="d-none d-md-table-cell">
                                                 <?php $st = $p['estado'];
                                                 $cls = $st === 'completado' ? 'success' : ($st === 'pendiente' ? 'warning' : 'danger'); ?>
-                                                <span class="badge rounded-pill text-bg-<?= $cls ?>"><?= htmlspecialchars($st) ?></span>
+                                                <span class="badge rounded-pill text-bg-<?= $cls ?>"><?= e($st) ?></span>
                                             </td>
-                                            <td><?= htmlspecialchars($p['created_at']) ?></td>
+                                            <td class="small d-none d-lg-table-cell"><?= e($p['created_at']) ?></td>
                                         </tr>
                                 <?php endforeach;
                                 endif; ?>
@@ -369,21 +352,21 @@ $resumenPlanes = rows($pdo, "
                 </div>
             </div>
 
-            <div class="col-lg-5">
-                <div class="card-elev p-3 reveal">
+            <div class="col-12 col-lg-5">
+                <div class="card-elev p-3 h-100">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Últimas suscripciones</h5>
-                        <a class="btn btn-sm btn-outline-success" href="/ecobici/suscripciones/index.php">Ver todas</a>
+                        <a class="btn btn-sm btn-outline-success" href="/ecobici/administrador/suscripciones.php">Ver todas</a>
                     </div>
                     <div class="table-responsive">
-                        <table class="table tbl align-middle">
+                        <table class="table align-middle">
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Usuario</th>
-                                    <th>Plan</th>
+                                    <th class="d-none d-sm-table-cell">Plan</th>
                                     <th>Estado</th>
-                                    <th>Inicio</th>
+                                    <th class="d-none d-md-table-cell">Inicio</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -393,15 +376,15 @@ $resumenPlanes = rows($pdo, "
                                     </tr>
                                     <?php else: foreach ($ultimasSubs as $s): ?>
                                         <tr>
-                                            <td>#<?= htmlspecialchars($s['id']) ?></td>
-                                            <td><?= htmlspecialchars($s['usuario']) ?></td>
-                                            <td><?= htmlspecialchars($s['plan']) ?></td>
+                                            <td>#<?= e($s['id']) ?></td>
+                                            <td><?= e($s['usuario']) ?></td>
+                                            <td class="d-none d-sm-table-cell"><?= e($s['plan']) ?></td>
                                             <td>
                                                 <?php $st = $s['estado'];
                                                 $cls = $st === 'activa' ? 'success' : ($st === 'pendiente' ? 'warning' : 'secondary'); ?>
-                                                <span class="badge rounded-pill text-bg-<?= $cls ?>"><?= htmlspecialchars($st) ?></span>
+                                                <span class="badge rounded-pill text-bg-<?= $cls ?>"><?= e($st) ?></span>
                                             </td>
-                                            <td><?= htmlspecialchars($s['fecha_inicio']) ?></td>
+                                            <td class="small d-none d-md-table-cell"><?= e($s['fecha_inicio']) ?></td>
                                         </tr>
                                 <?php endforeach;
                                 endif; ?>
@@ -412,13 +395,13 @@ $resumenPlanes = rows($pdo, "
             </div>
 
             <div class="col-12">
-                <div class="card-elev p-3 reveal">
+                <div class="card-elev p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h5 class="mb-0">Resumen de planes</h5>
-                        <a class="btn btn-sm btn-success" href="/ecobici/planes/index.php"><i class="bi bi-gear-wide-connected me-1"></i>Gestionar planes</a>
+                        <a class="btn btn-sm btn-success" href="/ecobici/administrador/planes.php"><i class="bi bi-gear-wide-connected me-1"></i>Gestionar planes</a>
                     </div>
                     <div class="table-responsive">
-                        <table class="table tbl align-middle">
+                        <table class="table align-middle">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -430,8 +413,8 @@ $resumenPlanes = rows($pdo, "
                             <tbody>
                                 <?php foreach ($resumenPlanes as $pl): ?>
                                     <tr>
-                                        <td>#<?= htmlspecialchars($pl['id']) ?></td>
-                                        <td><?= htmlspecialchars($pl['nombre']) ?></td>
+                                        <td>#<?= e($pl['id']) ?></td>
+                                        <td><?= e($pl['nombre']) ?></td>
                                         <td>Q <?= number_format((float)$pl['precio'], 2) ?></td>
                                         <td><span class="badge rounded-pill text-bg-success"><?= (int)$pl['activas'] ?></span></td>
                                     </tr>
@@ -443,48 +426,50 @@ $resumenPlanes = rows($pdo, "
             </div>
         </div>
 
-        <p class="mt-4 muted">EcoBici Puerto Barrios • Panel claro con detalles en verde.</p>
+        <p class="mt-4 muted">EcoBici Puerto Barrios • Panel Bootstrap responsivo con detalles en verde.</p>
     </main>
 
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-        // Reveal on scroll
-        const obs = new IntersectionObserver((entries) => {
-            entries.forEach(e => {
-                if (e.isIntersecting) {
-                    e.target.classList.add('show');
-                    obs.unobserve(e.target);
-                }
-            })
-        }, {
-            threshold: .1
-        });
-        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
-
-        // Count-up
+        // Contadores suaves
         function animateCount(el) {
-            const target = parseFloat(el.dataset.target || el.textContent || '0');
-            if (!isFinite(target)) return;
-            const dur = 900,
-                start = performance.now();
+            const t = parseFloat(el.dataset.target || el.textContent || '0');
+            if (!isFinite(t)) return;
+            const s = performance.now(),
+                d = 900;
 
-            function frame(t) {
-                const p = Math.min((t - start) / dur, 1),
-                    val = target * p;
-                el.textContent = Number.isInteger(target) ? Math.floor(val) : val.toFixed(2);
-                if (p < 1) requestAnimationFrame(frame);
+            function f(now) {
+                const p = Math.min((now - s) / d, 1),
+                    v = t * p;
+                el.textContent = Number.isInteger(t) ? Math.floor(v) : v.toFixed(2);
+                if (p < 1) requestAnimationFrame(f);
             }
-            requestAnimationFrame(frame);
+            requestAnimationFrame(f);
         }
         document.querySelectorAll('.count').forEach(animateCount);
 
-        // Charts
+        // Gráficas responsive
         const labelsPagos = <?= json_encode($labelsPagos) ?>;
         const dataPagos = <?= json_encode($dataPagos) ?>;
         const labelsSubs = <?= json_encode($labelsSubs ?: ['activa', 'pendiente', 'inactiva']) ?>;
         const dataSubs = <?= json_encode($dataSubs ?: [0, 0, 0]) ?>;
         const labelsTop = <?= json_encode($labelsTopPlanes) ?>;
         const dataTop = <?= json_encode($dataTopPlanes) ?>;
+
+        const common = {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 900
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        };
 
         new Chart(document.getElementById('chartPagos'), {
             type: 'bar',
@@ -494,22 +479,15 @@ $resumenPlanes = rows($pdo, "
                     label: 'Q',
                     data: dataPagos,
                     borderWidth: 1,
-                    backgroundColor: 'rgba(34,197,94,.3)',
+                    backgroundColor: 'rgba(34,197,94,.28)',
                     borderColor: '#16a34a'
                 }]
             },
             options: {
-                animation: {
-                    duration: 900
-                },
+                ...common,
                 scales: {
                     y: {
                         beginAtZero: true
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
                     }
                 }
             }
@@ -522,14 +500,12 @@ $resumenPlanes = rows($pdo, "
                 datasets: [{
                     data: dataSubs,
                     backgroundColor: ['#16a34a', '#f59e0b', '#9ca3af'],
-                    borderColor: '#ffffff',
+                    borderColor: '#fff',
                     borderWidth: 2
                 }]
             },
             options: {
-                animation: {
-                    duration: 900
-                },
+                ...common,
                 plugins: {
                     legend: {
                         position: 'bottom'
@@ -545,22 +521,15 @@ $resumenPlanes = rows($pdo, "
                 datasets: [{
                     data: dataTop,
                     borderWidth: 1,
-                    backgroundColor: 'rgba(34,197,94,.3)',
+                    backgroundColor: 'rgba(34,197,94,.28)',
                     borderColor: '#16a34a'
                 }]
             },
             options: {
-                animation: {
-                    duration: 900
-                },
+                ...common,
                 scales: {
                     y: {
                         beginAtZero: true
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: false
                     }
                 }
             }
