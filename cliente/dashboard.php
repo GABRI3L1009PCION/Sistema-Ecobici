@@ -398,10 +398,10 @@ if ($inicio && $fin) {
           </a>
         </div>
         <div class="col-12 col-md-6">
-          <a href="/ecobici/cliente/pagos.php" class="text-decoration-none">
+          <a href="/ecobici/cliente/pagos_historial.php" class="text-decoration-none">
             <div class="card p-3 h-100"><div class="d-flex align-items-center gap-3">
               <div class="icon-circle"><i class="bi bi-credit-card"></i></div>
-              <div><h6 class="mb-1 text-dark">Pagos</h6><small class="muted">Comprobantes y estado.</small></div>
+              <div><h6 class="mb-1 text-dark">Historial de Pagos</h6><small class="muted">Comprobantes y estado.</small></div>
             </div></div>
           </a>
         </div>
@@ -430,28 +430,6 @@ if ($inicio && $fin) {
           </a>
         </div>
       </div>
-
-      <!-- Último pago -->
-      <div class="card p-3 mt-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Último pago</h6>
-          <a href="/ecobici/cliente/pagos.php" class="btn btn-sm btn-outline-success">Historial</a>
-        </div>
-        <hr class="my-2">
-        <?php if (!empty($lastPay)): ?>
-          <div class="d-flex flex-wrap gap-3 small">
-            <div><span class="muted d-block">Monto</span><span class="fw-semibold">Q <?= number_format((float)$lastPay['monto'], 2) ?></span></div>
-            <div><span class="muted d-block">Método</span><span class="fw-semibold"><?= htmlspecialchars($lastPay['metodo']) ?></span></div>
-            <div><span class="muted d-block">Referencia</span><span class="fw-semibold"><?= htmlspecialchars($lastPay['referencia'] ?: '—') ?></span></div>
-            <div><span class="muted d-block">Fecha</span><span class="fw-semibold"><?= htmlspecialchars(date('d/m/Y', strtotime($lastPay['created_at']))) ?></span></div>
-          </div>
-        <?php else: ?>
-          <p class="muted mb-0">Aún no hay pagos completados.</p>
-        <?php endif; ?>
-      </div>
-    </div>
-  </div>
-</main>
 
 <!-- Bootstrap 5.3 vía CDN (JS) -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

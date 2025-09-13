@@ -349,6 +349,17 @@ $resumenPlanes = rows($pdo, "
                     </div>
                 </div>
             </div>
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 m-0">Panel del Administrador</h1>
+
+  <div class="d-flex gap-2">
+    <!-- Otros botones que ya tengas… -->
+    <a href="/ecobici/administrador/reportes.php"
+       class="btn btn-success">
+      📊 Ver reportes
+    </a>
+  </div>
+</div>
 
             <div class="col-12">
                 <div class="card-elev p-3">
